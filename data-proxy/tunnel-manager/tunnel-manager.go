@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	TunnelMgr = NewTunnelManager()
+	TunnelMgr *TunnelManager
 )
 
 const (
@@ -25,7 +25,8 @@ type TunnelManager struct {
 	tunnels map[string]*quic.Conn
 }
 
-func NewTunnelManager() *TunnelManager {
+func NewTunnelManager(pre string, l *slog.Logger) *TunnelManager {
+	l.Info("QUIC 管理器已启动", slog.String("pre", pre))
 	return &TunnelManager{
 		tunnels: make(map[string]*quic.Conn),
 	}

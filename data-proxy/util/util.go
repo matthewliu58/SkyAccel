@@ -2,6 +2,7 @@ package util
 
 import (
 	"math/rand"
+	"net"
 	"time"
 )
 
@@ -14,3 +15,18 @@ func GenerateRandomLetters(length int) string {
 	}
 	return result
 }
+
+func HopIPToNet(ipStr string) net.IP {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil // 非法IP，按你的逻辑处理
+	}
+	// 取 4字节 IPv4 格式
+	return ip.To4()
+}
+
+//func HopIPToNet(ip uint32) net.IP {
+//	b := make([]byte, 4)
+//	binary.BigEndian.PutUint32(b, ip)
+//	return b
+//}

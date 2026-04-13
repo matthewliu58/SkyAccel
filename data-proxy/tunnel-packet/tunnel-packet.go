@@ -179,10 +179,3 @@ func Parse(raw []byte) (*Packet, []SubPacket, error) {
 
 	return p, subs, nil
 }
-
-// HopIPToNet 将 uint32 格式 IP 转为 net.IP
-func HopIPToNet(ip uint32) net.IP {
-	b := make([]byte, 4)
-	binary.BigEndian.PutUint32(b, ip)
-	return b
-}

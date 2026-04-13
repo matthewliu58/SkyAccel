@@ -2,21 +2,22 @@ package main
 
 import (
 	"context"
+	"data-proxy/aggregator"
 	"data-proxy/config"
-	"data-proxy/util"
+	"data-proxy/tcp-server"
+	tunnel_manager "data-proxy/tunnel-manager"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"io"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
-	"time"
 
 	"log/slog"
 )
+
+// QUIC 退出信号
+var quicExit = make(chan error, 1)
 
 // 自定义Handler：带文件/行号
 type SourceHandler struct {
@@ -84,9 +85,28 @@ func main() {
 		return
 	}
 
+	// 启动聚合器
+	aggregator.GlobalAgg = aggregator.NewAggregator(pre, logger)
+	aggregator.GlobalAgg.Start()
+
+	// 启动反聚合器
+	aggregator.GlobalDisagg = aggregator.NewDisaggregator(pre, logger)
+
+	// 启动 tunnel manager
+	tunnel_manager.TunnelMgr = tunnel_manager.NewTunnelManager(pre, logger)
+
+	// 启动 quic listener（goroutine 运行，崩溃时通过 channel 通知 main）
+	go func() {
+		quicExit <- tunnel_manager.ListenAndServeQUIC(nil, pre, logger)
+	}()
+
 	for _, port := range config.Config_.ListenPorts {
-		// 启动 TCP server
-		go StartTCPServer(port, pre, accessLogger, logger)
+		// 启动 TCP server（先创建 listener，再启动 goroutine）
+		if err := tcp_server.StartTCPServerWithMgr(port, pre, accessLogger, logger); err != nil {
+			logger.Error("TCP server start failed", slog.String("pre", pre), "err", err)
+			return
+		}
+		go tcp_server.StartTCPServerRun(port, pre, accessLogger, logger)
 	}
 
 	// Gin
@@ -95,55 +115,23 @@ func main() {
 		c.JSON(http.StatusOK, "success")
 	})
 
-	port := "7095"
-	logger.Info("Listening", slog.String("pre", pre), "port", port)
-	if err := router.Run(":" + port); err != nil {
-		logger.Error("Gin Run failed", slog.String("pre", pre), "err", err)
-	}
-}
+	// TCP Server 管理接口
+	tcp_server.TCPServerManager(router)
 
-// StartTCPServer 不改动
-func StartTCPServer(port int, pre string, access, logger *slog.Logger) error {
-	port_ := ":" + strconv.Itoa(port)
-	listener, err := net.Listen("tcp", port_)
-	if err != nil {
-		return err
-	}
-	defer listener.Close()
-
-	logger.Info("tcp server started success", slog.String("pre", pre), slog.String("port", port_))
-
-	for {
-		var conn net.Conn
-		conn, err = listener.Accept()
-		if err != nil {
-			logger.Error("accept failed", slog.Any("err", err))
-			continue
+	// Gin 用 goroutine 运行
+	go func() {
+		port := "7095"
+		logger.Info("Listening", slog.String("pre", pre), "port", port)
+		if err := router.Run(":" + port); err != nil {
+			logger.Error("Gin Run failed", slog.String("pre", pre), "err", err)
 		}
-		go handleConnection(conn, access, logger)
+	}()
+
+	// 等待退出信号：QUIC 崩溃会导致程序退出
+	select {
+	case err := <-quicExit:
+		if err != nil {
+			logger.Error("QUIC server crashed, exiting", slog.String("pre", pre), "err", err)
+		}
 	}
-}
-
-// handleConnection 不改动
-func handleConnection(conn net.Conn, a, l *slog.Logger) {
-	defer func() { _ = conn.Close() }()
-
-	clientAddr := conn.RemoteAddr().(*net.TCPAddr)
-	clientIP := clientAddr.IP.String()
-	reqID := util.GenShortReqID(clientIP)
-	start := time.Now()
-
-	_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-	data, err := io.ReadAll(conn)
-	rtMs := float64(time.Since(start).Microseconds()) / 1000
-
-	if err != nil {
-		l.Error("", slog.String("req_id", reqID), slog.String("client_ip", clientIP), slog.Any("err", err))
-		return
-	}
-
-	a.Info("access", slog.String("req_id", reqID), slog.String("client_ip", clientIP),
-		slog.Float64("conn_rt_ms", rtMs), slog.Int("data_len", len(data)))
-
-	// 你的业务逻辑在这里
 }

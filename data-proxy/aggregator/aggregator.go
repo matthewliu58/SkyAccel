@@ -5,6 +5,7 @@ import (
 	"context"
 	manager "data-proxy/tunnel-manager"
 	packet "data-proxy/tunnel-packet"
+	"data-proxy/util"
 	"log/slog"
 	"net"
 	"sync"
@@ -22,10 +23,11 @@ const (
 // 消息结构
 // ------------------------------
 type aggregatorMsg struct {
-	routingKey string
-	nextHop    net.IP
-	userID     uint32
-	data       []byte
+	routingKey  string
+	routingInfo util.PathInfo
+	nextHop     net.IP
+	userID      uint32
+	data        []byte
 }
 
 // ------------------------------
@@ -102,7 +104,10 @@ var GlobalAgg *Aggregator
 // ------------------------------
 // NewAggregator
 // ------------------------------
-func NewAggregator(l *slog.Logger) *Aggregator {
+func NewAggregator(pre string, l *slog.Logger) *Aggregator {
+
+	l.Info("NewAggregator", "pre", pre)
+
 	agg := &Aggregator{
 		inputChan: make(chan *aggregatorMsg, inputChanSize),
 		workers:   make([]*worker, workerCount),
@@ -153,15 +158,17 @@ func (a *Aggregator) Start() {
 // ------------------------------
 func (a *Aggregator) AddToBatch(
 	routingKey string,
+	routingInfo util.PathInfo,
 	nextHop net.IP,
 	userID uint32,
 	data []byte,
 ) {
 	a.inputChan <- &aggregatorMsg{
-		routingKey: routingKey,
-		nextHop:    nextHop,
-		userID:     userID,
-		data:       data,
+		routingKey:  routingKey,
+		routingInfo: routingInfo,
+		nextHop:     nextHop,
+		userID:      userID,
+		data:        data,
 	}
 }
 
@@ -180,6 +187,7 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 			NextHop:    msg.nextHop,
 			pkt:        packet.NewPacket(),
 		}
+		//todo
 		w.batches[msg.routingKey] = b
 	}
 
