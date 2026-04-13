@@ -12,25 +12,27 @@ var (
 	Config_ *Config
 )
 
-// RateLimitConfig 限流配置
-type RateLimitConfig struct {
-	QPS      int `yaml:"qps"`
-	Burst    int `yaml:"burst"`
-	CleanInt int `yaml:"clean_interval"` // 分钟
+type Config struct {
+	Port       string     `yaml:"port"`
+	Listeners  []Listener `yaml:"listeners"`
+	RateLimit  RateLimit  `yaml:"rate_limit"`
+	Aggregator Aggregator `yaml:"aggregator"`
 }
 
-// AggregatorConfig 聚合器配置
-type AggregatorConfig struct {
+type Listener struct {
+	Proto string `yaml:"proto"` // tcp / udp
+	Port  int    `yaml:"port"`
+}
+
+type RateLimit struct {
+	QPS           int `yaml:"qps"`
+	Burst         int `yaml:"burst"`
+	CleanInterval int `yaml:"clean_interval"`
+}
+
+type Aggregator struct {
 	BufferSize     int `yaml:"buffer_size"`
 	BatchTimeoutMs int `yaml:"batch_timeout_ms"`
-}
-
-// Config 一级结构体，对应yaml平级配置
-type Config struct {
-	Port        string           `yaml:"port"`
-	ListenPorts []int            `yaml:"listen_ports"`
-	RateLimit   RateLimitConfig  `yaml:"rate_limit"`
-	Aggregator  AggregatorConfig `yaml:"aggregator"`
 }
 
 // ReadYamlConfig 读取同层级的config.yaml配置

@@ -47,7 +47,7 @@ func HandleQUICPacket(remoteAddr string, pkt []byte, l *slog.Logger) {
 			originAddr := net.JoinHostPort(originIP.String(), strconv.Itoa(int(header.Port)))
 
 			for _, sub := range subs {
-				backsourcer.GlobalBackSourcer.Submit(&backsourcer.BackSourceTask{
+				backsourcer.BackSourcerMap["tcp"].Submit(&backsourcer.BackSourceTask{
 					HopIP:      header.HopIP, // 从 Header 获取完整路径
 					Port:       header.Port,
 					UserID:     sub.UserID,

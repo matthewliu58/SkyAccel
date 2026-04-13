@@ -38,12 +38,20 @@ type BackSourcer struct {
 	protocol OriginProtocol
 }
 
-var GlobalBackSourcer *BackSourcer
+var (
+	BackSourcerMap = make(map[string]*BackSourcer)
+)
 
 // NewBackSourcer 默认使用 TCP 协议
 func NewBackSourcer(protocol string, pre string, l *slog.Logger) *BackSourcer {
 	l.Info("backsourcer init", slog.String("protocol", protocol), slog.String("pre", pre))
-	return NewBackSourcerWithProtocol(NewTCPProtocol(dialTimeout, ioTimeout))
+	switch protocol {
+	case "udp":
+		return NewBackSourcerWithProtocol(NewUDPProtocol(dialTimeout, ioTimeout))
+	case "tcp":
+		return NewBackSourcerWithProtocol(NewTCPProtocol(dialTimeout, ioTimeout))
+	}
+	return nil
 }
 
 // NewBackSourcerWithProtocol 支持自定义协议

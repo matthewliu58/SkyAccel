@@ -1,9 +1,23 @@
 port: "7095"
-listen_ports: [8001, 8002, 8003, 8004, 8005]
+
+# 每个端口明确写 协议 + 端口
+# 格式：tcp:8001、udp:8001、tcp:443、udp:443
+listen_ports:
+  - tcp:8001
+  - tcp:8002
+  - udp:8002
+  - tcp:8003
+  - udp:8003
+  - tcp:8004
+  - tcp:8005
+  - udp:443   # HTTP3/QUIC
+  - tcp:443   # HTTPS
+
 rate_limit:
   qps: 1000
   burst: 2000
   clean_interval: 5
+
 aggregator:
   buffer_size: 5120
   batch_timeout_ms: 10

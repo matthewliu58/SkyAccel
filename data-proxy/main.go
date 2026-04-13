@@ -17,9 +17,6 @@ import (
 	"runtime"
 )
 
-// QUIC 退出信号
-//var quicExit = make(chan error, 1)
-
 // 自定义Handler：带文件/行号
 type SourceHandler struct {
 	handler slog.Handler
@@ -86,15 +83,16 @@ func main() {
 		return
 	}
 
-	protocol := "tcp"
-	// 启动 server
-	server.ServerHandler = server.InitServerInterface(protocol, pre, logger)
-	if server.ServerHandler.Operate == nil {
-		logger.Error("server handler init failed", slog.String("pre", pre), "err", err)
-		return
+	for _, protocol := range []string{"tcp", "udp"} {
+		// 启动 server
+		server.ServerMap[protocol] = server.InitServerInterface(protocol, pre, logger)
+		if server.ServerMap[protocol].Operate == nil {
+			logger.Error("server handler init failed", slog.String("pre", pre), "err", err)
+			//return
+		}
+		// 启动 backsourcer
+		backsourcer.BackSourcerMap[protocol] = backsourcer.NewBackSourcer(protocol, pre, logger)
 	}
-	// 启动 backsourcer
-	backsourcer.GlobalBackSourcer = backsourcer.NewBackSourcer(protocol, pre, logger)
 
 	// 启动正向聚合器
 	aggregator.GlobalAggRequest = aggregator.NewAggregator(pre, logger)
@@ -113,19 +111,16 @@ func main() {
 	// 启动 tunnel manager
 	manager.TunnelMgr = manager.NewTunnelManager(pre, logger)
 
-	// 启动 quic listener（goroutine 运行，崩溃时通过 channel 通知 main）
-	go manager.ListenAndServeQUIC(HandleQUICPacket, pre, logger)
-	//go func() {
-	//	quicExit <- manager.ListenAndServeQUIC(HandleQUICPacket, pre, logger)
-	//}()
+	go func() {
+		_ = manager.ListenAndServeQUIC(HandleQUICPacket, pre, logger)
+	}()
 
-	for _, port := range config.Config_.ListenPorts {
-		// 启动 TCP server（先创建 listener，再启动 goroutine）
-		if err = server.ServerHandler.Operate.StartServerWithMgr(port, pre, logger); err != nil {
-			logger.Error("TCP server start failed", slog.String("pre", pre), "err", err)
-			return
+	for _, port := range config.Config_.Listeners {
+		if port.Proto != "tcp" && port.Proto != "udp" {
+			continue
 		}
-		go server.ServerHandler.Operate.StartServerRun(port, accessLogger, pre, logger)
+		_ = server.ServerMap[port.Proto].Operate.StartServerWithMgr(port.Port, pre, logger)
+		go server.ServerMap[port.Proto].Operate.StartServerRun(port.Port, accessLogger, pre, logger)
 	}
 
 	// Gin
@@ -138,19 +133,9 @@ func main() {
 	server.ServerManager(router, logger)
 
 	// Gin 用 goroutine 运行
-	//go func() {
 	port := "7095"
 	logger.Info("Listening", slog.String("pre", pre), "port", port)
 	if err = router.Run(":" + port); err != nil {
 		logger.Error("Gin Run failed", slog.String("pre", pre), "err", err)
 	}
-	//}()
-
-	// 等待退出信号：QUIC 崩溃会导致程序退出
-	//select {
-	//case err = <-quicExit:
-	//	if err != nil {
-	//		logger.Error("QUIC server crashed, exiting", slog.String("pre", pre), "err", err)
-	//	}
-	//}
 }

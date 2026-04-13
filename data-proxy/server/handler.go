@@ -33,7 +33,9 @@ type ServerInterface struct {
 	Operate ServerFuncs
 }
 
-var ServerHandler ServerInterface
+var (
+	ServerMap = make(map[string]ServerInterface)
+)
 
 func InitServerInterface(protocol string, pre string, logger *slog.Logger) ServerInterface {
 	switch protocol {

@@ -30,15 +30,22 @@ func ServerManager(r *gin.Engine, l *slog.Logger) {
 		req := util.GenerateRandomLetters(5)
 
 		portStr := c.Query("port")
+		protocol := c.Query("protocol")
 		if portStr == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "port is required"})
 			return
 		}
-		l.Info("server-manager add", slog.String("req", req), slog.String("portStr", portStr))
+		l.Info("server-manager add", slog.String("req", req),
+			slog.String("portStr", portStr), slog.String("protocol", protocol))
 
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid port"})
+			return
+		}
+
+		if protocol != "tcp" && protocol != "udp" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid protocol"})
 			return
 		}
 
@@ -53,14 +60,14 @@ func ServerManager(r *gin.Engine, l *slog.Logger) {
 		}
 
 		// 启动 TCP server（先创建 listener，失败则返回错误）
-		err = ServerHandler.Operate.StartServerWithMgr(port, req, logger)
+		err = ServerMap[protocol].Operate.StartServerWithMgr(port, req, logger)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		// 成功后再用 goroutine 运行
-		go ServerHandler.Operate.StartServerRun(port, accessLogger, req, logger)
+		go ServerMap[protocol].Operate.StartServerRun(port, accessLogger, req, logger)
 
 		c.JSON(http.StatusOK, gin.H{"message": "tcp server started", "port": port})
 	})
@@ -80,18 +87,26 @@ func ServerManager(r *gin.Engine, l *slog.Logger) {
 		req := util.GenerateRandomLetters(5)
 
 		portStr := c.Query("port")
+		protocol := c.Query("protocol")
 		if portStr == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "port is required"})
 			return
 		}
-		l.Info("server-manager del", slog.String("req", req), slog.String("portStr", portStr))
+		l.Info("server-manager del", slog.String("req", req),
+			slog.String("portStr", portStr), slog.String("protocol", protocol))
 
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid port"})
 			return
 		}
-		err = ServerHandler.Operate.StopServer(port, req, l)
+
+		if protocol != "tcp" && protocol != "udp" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid protocol"})
+			return
+		}
+
+		err = ServerMap[protocol].Operate.StopServer(port, req, l)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
