@@ -23,6 +23,7 @@ const (
 // 消息结构
 // ------------------------------
 type aggregatorMsg struct {
+	emerge      bool
 	routingKey  string
 	port        uint16
 	routingInfo util.PathInfo
@@ -41,6 +42,7 @@ type Batch struct {
 	pkt        *packet.Packet
 	closed     bool
 	inHeap     bool
+	createTime time.Time
 }
 
 // ------------------------------
@@ -83,7 +85,7 @@ func (h *MinHeap) Pop() any {
 // Worker 结构体
 // ------------------------------
 type worker struct {
-	batches map[string]*Batch
+	batches map[string]*Batch //todo 数据老化
 	heap    MinHeap
 	mu      sync.Mutex
 	logger  *slog.Logger
@@ -160,6 +162,7 @@ func (a *Aggregator) Start() {
 // AddToBatch
 // ------------------------------
 func (a *Aggregator) AddToBatch(
+	emerge bool,
 	routingKey string,
 	port uint16,
 	routingInfo util.PathInfo,
@@ -168,6 +171,7 @@ func (a *Aggregator) AddToBatch(
 	data []byte,
 ) {
 	a.inputChan <- &aggregatorMsg{
+		emerge:      emerge,
 		routingKey:  routingKey,
 		port:        port,
 		routingInfo: routingInfo,
@@ -186,6 +190,11 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 	buffSize := config.Config_.Aggregator.BufferSize
 	batchTimeout := time.Duration(config.Config_.Aggregator.BatchTimeoutMs) * time.Millisecond
 
+	if len(msg.data) >= 1024 {
+		msg.emerge = true
+		buffSize = len(msg.data) + 2*packet.HeaderSize
+	}
+
 	w.mu.Lock()
 
 	b := w.batches[msg.routingKey]
@@ -194,6 +203,7 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 			RoutingKey: msg.routingKey,
 			NextHop:    msg.nextHop,
 			pkt:        packet.NewPacket(buffSize),
+			createTime: time.Now(),
 		}
 
 		for i, h := range msg.routingInfo.Hops {
@@ -205,12 +215,18 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 		w.batches[msg.routingKey] = b
 	}
 
+	if msg.emerge { // 紧急包，直接发送
+		w.flush(b, b.BuffSize)
+		return
+	}
+
 	ok := b.pkt.AppendUserPacket(msg.userID, msg.data)
 	if !ok {
 		// 包满了：先加入待发送列表
 		toSend = append(toSend, b)
 		// 重置包
 		b.pkt = packet.NewPacket(buffSize)
+		b.createTime = time.Now()
 		b.inHeap = false
 		// 把当前这条重新加进去
 		b.pkt.AppendUserPacket(msg.userID, msg.data)
@@ -228,7 +244,7 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 	w.mu.Unlock()
 
 	// 锁外统一发送
-	for _, b := range toSend {
+	for _, b = range toSend {
 		w.flush(b, buffSize)
 	}
 }
@@ -279,4 +295,5 @@ func (w *worker) flush(b *Batch, buffSize int) {
 
 	// 重置
 	b.pkt = packet.NewPacket(buffSize)
+	b.createTime = time.Now()
 }

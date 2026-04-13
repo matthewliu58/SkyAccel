@@ -22,7 +22,7 @@ const (
 // TunnelManager 管理所有 QUIC 隧道
 type TunnelManager struct {
 	mu      sync.RWMutex
-	tunnels map[string]*quic.Conn
+	tunnels map[string]*quic.Conn //todo 很久没数据是不是要删除
 }
 
 func NewTunnelManager(pre string, l *slog.Logger) *TunnelManager {
@@ -52,14 +52,12 @@ func (m *TunnelManager) SendPacket(
 	}
 
 	// 发送数据
-	success := false
+	success := true
 	stream, err := conn.OpenUniStreamSync(ctx)
 	if err != nil {
 		// 发送失败，清理无效连接，下次自动重连
 		m.CloseTunnel(remoteIP, pre, l)
-		//return err
-	} else {
-		success = true
+		success = false
 	}
 
 	//try again

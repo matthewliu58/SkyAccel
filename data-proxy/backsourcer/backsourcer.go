@@ -107,6 +107,7 @@ func (bs *BackSourcer) doOriginRequest(task *BackSourceTask) {
 	nextHop := hops[0] // 修正：hops[1] 会越界，这里应该是 hops[0]
 
 	aggregator.GlobalAggResponse.AddToBatch(
+		false,
 		routingKey,
 		0,
 		routingInfo,

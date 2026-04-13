@@ -19,7 +19,7 @@ type routingInfo struct {
 }
 
 var (
-	routingMap   = make(map[int]routingInfo)
+	routingMap   = make(map[int]routingInfo) //todo 很久没触发删除
 	routingMutex sync.RWMutex
 )
 
@@ -130,7 +130,7 @@ func handleConnection(conn net.Conn, port int, a, l *slog.Logger) {
 	defer cleanup() // 函数退出自动注销
 
 	// 扔进聚合器
-	aggregator.GlobalAggRequest.AddToBatch(routingKey, uint16(p64), pathInfo, nextHop, userID, data)
+	aggregator.GlobalAggRequest.AddToBatch(false, routingKey, uint16(p64), pathInfo, nextHop, userID, data)
 
 	// 阻塞等下行回复
 	select {
