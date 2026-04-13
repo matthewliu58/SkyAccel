@@ -31,7 +31,7 @@ func PutKey(cli *clientv3.Client, key, value, pre string, logger *slog.Logger) {
 	if err != nil {
 		logger.Error("Put error", slog.Any("err", err))
 	} else {
-		logger.Info("Put", slog.String("pre", pre), key, value)
+		logger.Info("Put", slog.String("pre", pre), slog.String(key, value))
 	}
 }
 
@@ -63,14 +63,14 @@ func DeleteKey(cli *clientv3.Client, key string, logger *slog.Logger) {
 
 	resp, err := cli.Delete(ctx, key)
 	if err != nil {
-		logger.Error("Delete error:", err)
+		logger.Error("Delete error", slog.Any("err", err))
 		return
 	}
 
 	if resp.Deleted > 0 {
-		logger.Info("Deleted key %s successfully\n", key)
+		logger.Info("Deleted key successfully", slog.String("key", key))
 	} else {
-		logger.Warn("Key %s not found\n", key)
+		logger.Warn("Key not found", slog.String("key", key))
 	}
 }
 
@@ -81,12 +81,12 @@ func GetKey(cli *clientv3.Client, key string, logger *slog.Logger) {
 
 	resp, err := cli.Get(ctx, key)
 	if err != nil {
-		logger.Error("Get error:", err)
+		logger.Error("Get error", slog.Any("err", err))
 		return
 	}
 
 	for _, kv := range resp.Kvs {
-		logger.Info("Get %s = %s\n", string(kv.Key), string(kv.Value))
+		logger.Info("Get key = val", slog.String(string(kv.Key), string(kv.Value)))
 	}
 }
 
