@@ -18,7 +18,7 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
-func ListenAndServeQUIC(handler func(remoteAddr string, data []byte), pre string, l *slog.Logger) error {
+func ListenAndServeQUIC(handler func(remoteAddr string, data []byte, l *slog.Logger), pre string, l *slog.Logger) error {
 	tlsConfig := GenerateTLSConfig()
 	addr := net.JoinHostPort("0.0.0.0", QUIC_PORT)
 
@@ -37,7 +37,7 @@ func ListenAndServeQUIC(handler func(remoteAddr string, data []byte), pre string
 	}
 }
 
-func handleConn(conn *quic.Conn, handler func(remoteAddr string, data []byte), pre string, l *slog.Logger) {
+func handleConn(conn *quic.Conn, handler func(remoteAddr string, data []byte, l *slog.Logger), pre string, l *slog.Logger) {
 
 	defer conn.CloseWithError(0, "exit")
 	remote := conn.RemoteAddr().String()
@@ -71,7 +71,7 @@ func handleConn(conn *quic.Conn, handler func(remoteAddr string, data []byte), p
 			continue
 		}
 
-		handler(remote, buf)
+		handler(remote, buf, l)
 	}
 }
 

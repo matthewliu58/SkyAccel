@@ -63,6 +63,21 @@ func (p *Packet) SetHopPos(pos byte) {
 	}
 }
 
+// AdvanceHop HopPos + 1，并写回 Buf
+func (p *Packet) AdvanceHop() {
+	if p.HopPos < MaxHops-1 {
+		p.HopPos++
+		p.Buf[0] = p.HopPos
+	}
+}
+
+// AdvanceRawHop 原始字节 HopPos + 1（直接操作字节数组）
+func AdvanceRawHop(pkt []byte) {
+	if len(pkt) >= HeaderSize && pkt[0] < MaxHops-1 {
+		pkt[0]++
+	}
+}
+
 // SetPort 设置目的端口
 func (p *Packet) SetPort(port uint16) {
 	p.Port = port
