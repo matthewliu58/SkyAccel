@@ -107,7 +107,7 @@ func (d *DijkstraSolver) Computing(start, end, pre string, logger *slog.Logger) 
 
 		// 到达终点，回溯路径并返回
 		if currNode == end {
-			path := []string{}
+			var path []string
 			for node := end; node != ""; node = prev[node] {
 				path = append([]string{node}, path...)
 			}

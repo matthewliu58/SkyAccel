@@ -4,8 +4,8 @@ import (
 	"context"
 	"data-proxy/backsourcer"
 	"data-proxy/disaggregator"
-	tunnel_manager "data-proxy/tunnel-manager"
-	tunnel_packet "data-proxy/tunnel-packet"
+	manager "data-proxy/tunnel-manager"
+	packet "data-proxy/tunnel-packet"
 	"data-proxy/util"
 	"log/slog"
 	"net"
@@ -14,12 +14,12 @@ import (
 
 // HandleQUICPacket QUIC 收到包后，唯一入口
 func HandleQUICPacket(remoteAddr string, pkt []byte, l *slog.Logger) {
-	if len(pkt) < tunnel_packet.HeaderSize {
+	if len(pkt) < packet.HeaderSize {
 		return
 	}
 
 	// 解析包头
-	header, err := tunnel_packet.ParseHeader(pkt)
+	header, err := packet.ParseHeader(pkt)
 	if err != nil {
 		return
 	}
@@ -28,7 +28,7 @@ func HandleQUICPacket(remoteAddr string, pkt []byte, l *slog.Logger) {
 		// === 去程：访问源站 ===
 		// 判断下一个 hop 是不是源站（pos >= 2 或 下一个 IP 是 0）
 		isLastHop := header.HopPos == 2
-		if int(header.HopPos)+2 < tunnel_packet.MaxHops {
+		if int(header.HopPos)+2 < packet.MaxHops {
 			if header.HopIP[header.HopPos+2] == 0 {
 				isLastHop = true
 			}
@@ -36,7 +36,8 @@ func HandleQUICPacket(remoteAddr string, pkt []byte, l *slog.Logger) {
 
 		if isLastHop {
 			// 源站：交给 backsourcer
-			_, subs, err := tunnel_packet.Parse(pkt, len(pkt))
+			var subs []packet.SubPacket
+			_, subs, err = packet.Parse(pkt, len(pkt))
 			if err != nil || len(subs) == 0 {
 				return
 			}
@@ -57,8 +58,8 @@ func HandleQUICPacket(remoteAddr string, pkt []byte, l *slog.Logger) {
 		} else {
 			// 不是源站：转发给下一个 hop，更新 pos
 			nextIP := util.Uint32ToIP(header.HopIP[header.HopPos+1])
-			tunnel_packet.AdvanceRawHop(pkt)
-			if err := tunnel_manager.TunnelMgr.SendPacket(context.Background(), nextIP, pkt, "quic", l); err != nil {
+			packet.AdvanceRawHop(pkt)
+			if err = manager.TunnelMgr.SendPacket(context.Background(), nextIP, pkt, "quic", l); err != nil {
 				l.Error("去程转发失败", "err", err)
 			}
 		}
@@ -66,7 +67,7 @@ func HandleQUICPacket(remoteAddr string, pkt []byte, l *slog.Logger) {
 		// === 返程：返回给用户 ===
 		// 判断是不是到目的地了（下一个是 0 或 pos >= 3）
 		isLastHop := header.HopPos == 3
-		if int(header.HopPos)+1 < tunnel_packet.MaxHops {
+		if int(header.HopPos)+1 < packet.MaxHops {
 			if header.HopIP[header.HopPos+1] == 0 {
 				isLastHop = true
 			}
@@ -74,7 +75,8 @@ func HandleQUICPacket(remoteAddr string, pkt []byte, l *slog.Logger) {
 
 		if isLastHop {
 			// 到目的地：交给 disaggregator
-			_, subs, err := tunnel_packet.Parse(pkt, len(pkt))
+			var subs []packet.SubPacket
+			_, subs, err = packet.Parse(pkt, len(pkt))
 			if err != nil || len(subs) == 0 {
 				return
 			}
@@ -85,8 +87,8 @@ func HandleQUICPacket(remoteAddr string, pkt []byte, l *slog.Logger) {
 		} else {
 			// 没到目的地：转发给下一个 hop，更新 pos
 			nextIP := util.Uint32ToIP(header.HopIP[header.HopPos+1])
-			tunnel_packet.AdvanceRawHop(pkt)
-			if err := tunnel_manager.TunnelMgr.SendPacket(context.Background(), nextIP, pkt, "quic", l); err != nil {
+			packet.AdvanceRawHop(pkt)
+			if err = manager.TunnelMgr.SendPacket(context.Background(), nextIP, pkt, "quic", l); err != nil {
 				l.Error("返程转发失败", "err", err)
 			}
 		}

@@ -62,20 +62,20 @@ func handleConnection(conn net.Conn, port int, a, l *slog.Logger) {
 
 	var routeInfo *util.RoutingInfo
 	if !hasRoute || time.Now().After(ri.deadline) {
+		go func() {
+			//todo get routing from control plane by an goroutine
+			routeInfo = &util.RoutingInfo{} //prot
 
-		//todo get routing from control plane
-		routeInfo = &util.RoutingInfo{} //prot
-
-		// 更新缓存
-		routingMutex.Lock()
-		routingMap[port] = routingInfo{
-			info:     routeInfo,
-			deadline: time.Now().Add(routeTimeout),
-		}
-		routingMutex.Unlock()
-	} else {
-		routeInfo = ri.info
+			// 更新缓存
+			routingMutex.Lock()
+			routingMap[port] = routingInfo{
+				info:     routeInfo,
+				deadline: time.Now().Add(routeTimeout),
+			}
+			routingMutex.Unlock()
+		}()
 	}
+	routeInfo = ri.info
 
 	if len(routeInfo.Routing) == 0 {
 		l.Error("no path in routing info", slog.Any("req_id", reqID))
