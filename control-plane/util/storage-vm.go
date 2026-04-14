@@ -37,7 +37,7 @@ type FileStorage struct {
 func NewFileStorage(storageDir string, expireMinutes int, pre string, l *slog.Logger) (*FileStorage, error) {
 
 	if err := os.MkdirAll(storageDir, 0755); err != nil {
-		return nil, fmt.Errorf("创建存储目录失败: %w", err)
+		return nil, fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
 	expireDur := expireTime * time.Minute
@@ -60,7 +60,7 @@ func NewFileStorage(storageDir string, expireMinutes int, pre string, l *slog.Lo
 func (fs *FileStorage) Put(report *model.VMReport, pre string) (string, error) {
 
 	if report == nil || report.VMID == "" {
-		return "", errors.New("VMReport不能为空且VMID必须非空")
+		return "", errors.New("VMReport cannot be empty and VMID must be non-empty")
 	}
 
 	fs.mu.Lock()
@@ -73,17 +73,17 @@ func (fs *FileStorage) Put(report *model.VMReport, pre string) (string, error) {
 
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
-		return "", fmt.Errorf("JSON序列化失败: %w", err)
+		return "", fmt.Errorf("JSON serialization failed: %w", err)
 	}
 	fs.l.Info("put file data", slog.String("pre", pre), slog.String("data", string(data)))
 
 	if err = os.WriteFile(tmpFilePath, data, 0644); err != nil {
-		return "", fmt.Errorf("写入临时文件失败: %w", err)
+		return "", fmt.Errorf("failed to write temporary file: %w", err)
 	}
 
 	if err = os.Rename(tmpFilePath, filePath); err != nil {
-		_ = os.Remove(tmpFilePath) // 清理临时文件
-		return "", fmt.Errorf("重命名文件失败: %w", err)
+		_ = os.Remove(tmpFilePath)
+		return "", fmt.Errorf("failed to rename file: %w", err)
 	}
 
 	return report.ReportID, nil
@@ -91,7 +91,7 @@ func (fs *FileStorage) Put(report *model.VMReport, pre string) (string, error) {
 
 func (fs *FileStorage) Get(vmID, pre string) (*model.VMReport, error) {
 	if vmID == "" {
-		return nil, errors.New("VMID不能为空")
+		return nil, errors.New("VMID cannot be empty")
 	}
 
 	fs.mu.RLock()
@@ -99,7 +99,7 @@ func (fs *FileStorage) Get(vmID, pre string) (*model.VMReport, error) {
 
 	files, err := os.ReadDir(fs.StorageDir)
 	if err != nil {
-		return nil, fmt.Errorf("读取存储目录失败: %w", err)
+		return nil, fmt.Errorf("failed to read storage directory: %w", err)
 	}
 
 	var latestFile os.DirEntry
@@ -130,18 +130,18 @@ func (fs *FileStorage) Get(vmID, pre string) (*model.VMReport, error) {
 	}
 
 	if latestFile == nil {
-		return nil, fmt.Errorf("VM[%s]的上报文件不存在", vmID)
+		return nil, fmt.Errorf("report file for VM[%s] does not exist", vmID)
 	}
 
 	filePath := filepath.Join(fs.StorageDir, latestFile.Name())
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("读取文件失败: %w", err)
+		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	var report model.VMReport
 	if err = json.Unmarshal(data, &report); err != nil {
-		return nil, fmt.Errorf("JSON反序列化失败: %w", err)
+		return nil, fmt.Errorf("JSON deserialization failed: %w", err)
 	}
 
 	return &report, nil
@@ -162,7 +162,7 @@ func (fs *FileStorage) startCleanupWorker(pre string) {
 
 	for range fs.cleanupTicker.C {
 		if err := fs.cleanupExpiredFiles(pre); err != nil {
-			fs.l.Error("清理过期文件失败", slog.String("pre", pre), slog.Any("err", err))
+			fs.l.Error("Failed to clean up expired files", slog.String("pre", pre), slog.Any("err", err))
 		}
 	}
 }
@@ -173,7 +173,7 @@ func (fs *FileStorage) cleanupExpiredFiles(pre string) error {
 
 	files, err := os.ReadDir(fs.StorageDir)
 	if err != nil {
-		return fmt.Errorf("读取目录失败: %w", err)
+		return fmt.Errorf("failed to read directory: %w", err)
 	}
 
 	expireTime_ := time.Now().Add(-fs.expireDuration)
@@ -185,7 +185,7 @@ func (fs *FileStorage) cleanupExpiredFiles(pre string) error {
 
 		fileInfo, err := file.Info()
 		if err != nil {
-			fs.l.Error("获取文件信息失败", slog.String("pre", pre),
+			fs.l.Error("Failed to get file info", slog.String("pre", pre),
 				slog.String("fileName", file.Name()), slog.Any("err", err))
 			continue
 		}
@@ -193,10 +193,10 @@ func (fs *FileStorage) cleanupExpiredFiles(pre string) error {
 		if fileInfo.ModTime().Before(expireTime_) {
 			filePath := filepath.Join(fs.StorageDir, file.Name())
 			if err := os.Remove(filePath); err != nil {
-				fs.l.Error("删除过期文件失败", slog.String("pre", pre),
+				fs.l.Error("Failed to delete expired file", slog.String("pre", pre),
 					slog.String("filePath", filePath), slog.Any("err", err))
 			} else {
-				fs.l.Info("清理过期文件", slog.String("pre", pre),
+				fs.l.Info("Cleaned up expired file", slog.String("pre", pre),
 					slog.String("filePath", filePath))
 			}
 		}
@@ -212,7 +212,7 @@ func (fs *FileStorage) GetAll(logPre string) ([]*model.VMReport, error) {
 
 	files, err := os.ReadDir(fs.StorageDir)
 	if err != nil {
-		return nil, fmt.Errorf("读取目录失败: %w", err)
+		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
 	var reports []*model.VMReport
@@ -227,14 +227,14 @@ func (fs *FileStorage) GetAll(logPre string) ([]*model.VMReport, error) {
 		filePath := filepath.Join(fs.StorageDir, fileName)
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			fs.l.Warn("读取文件内容失败，跳过该文件", slog.String("pre", logPre),
+			fs.l.Warn("Failed to read file content, skipping", slog.String("pre", logPre),
 				slog.String("file_name", fileName))
 			continue
 		}
 
 		var report model.VMReport
 		if err := json.Unmarshal(data, &report); err != nil {
-			fs.l.Warn("JSON反序列化失败，跳过该文件", slog.String("pre", logPre),
+			fs.l.Warn("JSON deserialization failed, skipping", slog.String("pre", logPre),
 				slog.String("file_name", fileName))
 			continue
 		}
@@ -251,7 +251,7 @@ func (fs *FileStorage) GetRecent(n int, logPre string) ([]*model.VMReport, error
 
 	files, err := os.ReadDir(fs.StorageDir)
 	if err != nil {
-		return nil, fmt.Errorf("读取目录失败: %w", err)
+		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
 	type fileInfo struct {
@@ -292,13 +292,13 @@ func (fs *FileStorage) GetRecent(n int, logPre string) ([]*model.VMReport, error
 		filePath := filepath.Join(fs.StorageDir, fileInfos[i].fileName)
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			fs.l.Warn("读取文件失败，跳过", slog.String("pre", logPre),
+			fs.l.Warn("Failed to read file, skipping", slog.String("pre", logPre),
 				slog.String("file", fileInfos[i].fileName))
 			continue
 		}
 		var report model.VMReport
 		if err = json.Unmarshal(data, &report); err != nil {
-			fs.l.Warn("JSON反序列化失败，跳过", slog.String("pre", logPre),
+			fs.l.Warn("JSON deserialization failed, skipping", slog.String("pre", logPre),
 				slog.String("file", fileInfos[i].fileName))
 			continue
 		}
