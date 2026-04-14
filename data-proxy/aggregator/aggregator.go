@@ -13,16 +13,12 @@ import (
 	"time"
 )
 
-// 配置常量
 const (
 	inputChanSize = 100000
 	workerCount   = 8
-	batchMaxAge   = 60 * time.Second // batch 存活最大时间
+	batchMaxAge   = 60 * time.Second
 )
 
-// ------------------------------
-// 消息结构
-// ------------------------------
 type aggregatorMsg struct {
 	emerge      bool
 	routingKey  string
@@ -33,9 +29,6 @@ type aggregatorMsg struct {
 	data        []byte
 }
 
-// ------------------------------
-// Batch 结构体
-// ------------------------------
 type Batch struct {
 	BuffSize   int
 	RoutingKey string
@@ -46,9 +39,6 @@ type Batch struct {
 	createTime time.Time
 }
 
-// ------------------------------
-// 最小堆
-// ------------------------------
 type HeapItem struct {
 	batch    *Batch
 	deadline time.Time
@@ -82,9 +72,6 @@ func (h *MinHeap) Pop() any {
 	return item
 }
 
-// ------------------------------
-// Worker 结构体
-// ------------------------------
 type worker struct {
 	batches map[string]*Batch
 	heap    MinHeap
@@ -93,24 +80,15 @@ type worker struct {
 	stopCh  chan struct{}
 }
 
-// ------------------------------
-// 全局 Aggregator
-// ------------------------------
 type Aggregator struct {
 	inputChan chan *aggregatorMsg
 	workers   []*worker
 	wg        sync.WaitGroup
 }
 
-// ------------------------------
-// 全局单例
-// ------------------------------
 var GlobalAggRequest *Aggregator
 var GlobalAggResponse *Aggregator
 
-// ------------------------------
-// NewAggregator
-// ------------------------------
 func NewAggregator(pre string, l *slog.Logger) *Aggregator {
 
 	l.Info("NewAggregator", "pre", pre)
@@ -132,14 +110,12 @@ func NewAggregator(pre string, l *slog.Logger) *Aggregator {
 	return agg
 }
 
-// ------------------------------
-// Start
-// ------------------------------
-func (a *Aggregator) Start() {
-	for _, w := range a.workers {
-		//w := w
+func (a *Aggregator) Start(pre string, l *slog.Logger) {
 
-		// 消息处理协程
+	l.Info("Aggregator Start", "pre", pre)
+
+	for _, w := range a.workers {
+
 		a.wg.Add(1)
 		go func() {
 			defer a.wg.Done()
@@ -148,7 +124,6 @@ func (a *Aggregator) Start() {
 			}
 		}()
 
-		// 超时检查协程
 		a.wg.Add(1)
 		go func() {
 			defer a.wg.Done()
@@ -159,7 +134,6 @@ func (a *Aggregator) Start() {
 			}
 		}()
 
-		// 老化检查协程：每 10 秒清理超时的 batch
 		a.wg.Add(1)
 		go func(w *worker) {
 			defer a.wg.Done()
@@ -177,9 +151,6 @@ func (a *Aggregator) Start() {
 	}
 }
 
-// ------------------------------
-// AddToBatch
-// ------------------------------
 func (a *Aggregator) AddToBatch(
 	emerge bool,
 	routingKey string,
@@ -200,11 +171,10 @@ func (a *Aggregator) AddToBatch(
 	}
 }
 
-// ------------------------------
-// handleMsg
-// ------------------------------
 func (w *worker) handleMsg(msg *aggregatorMsg) {
 	var toSend []*Batch
+
+	w.logger.Info("handleMsg", "routingKey", msg.routingKey, "nextHop", msg.nextHop.String(), "payloadLen", len(msg.data))
 
 	buffSize := config.Config_.Aggregator.BufferSize
 	batchTimeout := time.Duration(config.Config_.Aggregator.BatchTimeoutMs) * time.Millisecond
@@ -234,25 +204,24 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 		w.batches[msg.routingKey] = b
 	}
 
-	if msg.emerge { // 紧急包，直接发送
+	if msg.emerge {
 		w.flush(b, b.BuffSize)
 		return
 	}
 
 	ok := b.pkt.AppendUserPacket(msg.userID, msg.data)
 	if !ok {
-		// 包满了：先加入待发送列表
 		toSend = append(toSend, b)
-		// 重置包
+
 		b.pkt = packet.NewPacket(buffSize)
+
 		b.createTime = time.Now()
 		b.inHeap = false
-		// 把当前这条重新加进去
 		b.pkt.AppendUserPacket(msg.userID, msg.data)
 	}
 
-	// 不在堆里则加入
 	if !b.inHeap {
+		w.logger.Info("add to heap", "routingKey", b.RoutingKey, "nextHop", b.NextHop.String())
 		heap.Push(&w.heap, &HeapItem{
 			batch:    b,
 			deadline: time.Now().Add(batchTimeout),
@@ -262,15 +231,11 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 
 	w.mu.Unlock()
 
-	// 锁外统一发送
 	for _, b = range toSend {
 		w.flush(b, buffSize)
 	}
 }
 
-// ------------------------------
-// checkTimeout
-// ------------------------------
 func (w *worker) checkTimeout() {
 	var toSend []*Batch
 
@@ -290,15 +255,11 @@ func (w *worker) checkTimeout() {
 
 	w.mu.Unlock()
 
-	// 锁外发送
 	for _, b := range toSend {
 		w.flush(b, b.BuffSize)
 	}
 }
 
-// ------------------------------
-// flush
-// ------------------------------
 func (w *worker) flush(b *Batch, buffSize int) {
 	if b.closed || b.pkt == nil || b.pkt.PayloadLen == 0 {
 		return
@@ -307,23 +268,18 @@ func (w *worker) flush(b *Batch, buffSize int) {
 	b.pkt.SerializeHead()
 	buf := b.pkt.Buf[:b.pkt.TotalBytes()]
 
-	// 异步发送，不阻塞任何逻辑
 	go func() {
+		w.logger.Info("flush batch", "routingKey", b.RoutingKey, "nextHop", b.NextHop.String(), "payloadLen", b.pkt.PayloadLen)
 		_ = manager.TunnelMgr.SendPacket(context.Background(), b.NextHop, buf, "", w.logger)
 	}()
 
-	// 重置
 	b.pkt = packet.NewPacket(buffSize)
 	b.createTime = time.Now()
 }
 
-// ------------------------------
-// evictStaleBatches 清理超时的 batch
-// ------------------------------
 func (w *worker) evictStaleBatches() {
 	now := time.Now()
 
-	// 1. 极短锁：只复制所有 key
 	w.mu.RLock()
 	keys := make([]string, 0, len(w.batches))
 	for key := range w.batches {
@@ -331,9 +287,8 @@ func (w *worker) evictStaleBatches() {
 	}
 	w.mu.RUnlock()
 
-	// 2. 无锁遍历，逐个判断 + 逐个删除
 	for _, key := range keys {
-		// 瞬间加锁，只检查这一个
+
 		w.mu.RLock()
 		b, exists := w.batches[key]
 		w.mu.RUnlock()
@@ -342,7 +297,6 @@ func (w *worker) evictStaleBatches() {
 			continue
 		}
 
-		// 判断过期
 		if now.Sub(b.createTime) <= batchMaxAge {
 			continue
 		}
@@ -351,7 +305,6 @@ func (w *worker) evictStaleBatches() {
 		delete(w.batches, key)
 		w.mu.Unlock()
 
-		// 日志放外面！不占锁！
 		w.logger.Info("evict stale batch", "routingKey", key)
 	}
 }

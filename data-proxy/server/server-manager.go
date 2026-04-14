@@ -56,7 +56,6 @@ func ServerManager(r *gin.Engine, a, l *slog.Logger) {
 			return
 		}
 
-		// 成功后再用 goroutine 运行
 		go ServerMap[protocol].Operate.StartServerRun(port, a, req, l)
 
 		c.JSON(http.StatusOK, gin.H{"message": "tcp server started", "port": port})

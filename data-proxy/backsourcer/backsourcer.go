@@ -17,21 +17,18 @@ const (
 	ioTimeout     = 5 * time.Second
 )
 
-// BackSourceTask 从隧道解包出来的结构
 type BackSourceTask struct {
 	HopIP      [4]uint32
 	Port       uint16
 	UserID     uint32
-	OriginAddr string // 必须是 ip:port
+	OriginAddr string //ip:port
 	ReqData    []byte
 }
 
-// OriginProtocol 源站访问协议接口（抽象）
 type OriginProtocol interface {
 	DoRequest(addr string, reqData []byte) ([]byte, error)
 }
 
-// BackSourcer 核心回源器（依赖协议接口）
 type BackSourcer struct {
 	taskChan chan *BackSourceTask
 	wg       sync.WaitGroup
@@ -42,58 +39,59 @@ var (
 	BackSourcerMap = make(map[string]*BackSourcer)
 )
 
-// NewBackSourcer 默认使用 TCP 协议
 func NewBackSourcer(protocol string, pre string, l *slog.Logger) *BackSourcer {
-	l.Info("backsourcer init", slog.String("protocol", protocol), slog.String("pre", pre))
+
+	l.Info("NewBackSourcer", slog.String("protocol", protocol), slog.String("pre", pre))
+
 	switch protocol {
 	case "udp":
-		return NewBackSourcerWithProtocol(NewUDPProtocol(dialTimeout, ioTimeout))
+		return NewBackSourcerWithProtocol(NewUDPProtocol(dialTimeout, ioTimeout), l)
 	case "tcp":
-		return NewBackSourcerWithProtocol(NewTCPProtocol(dialTimeout, ioTimeout))
+		return NewBackSourcerWithProtocol(NewTCPProtocol(dialTimeout, ioTimeout), l)
 	}
 	return nil
 }
 
-// NewBackSourcerWithProtocol 支持自定义协议
-func NewBackSourcerWithProtocol(p OriginProtocol) *BackSourcer {
+func NewBackSourcerWithProtocol(p OriginProtocol, l *slog.Logger) *BackSourcer {
 	bs := &BackSourcer{
 		taskChan: make(chan *BackSourceTask, taskQueueSize),
 		protocol: p,
 	}
-	bs.startWorkers()
+	bs.startWorkers(l)
 	return bs
 }
 
-// Submit 提交任务
 func (bs *BackSourcer) Submit(task *BackSourceTask) {
 	bs.taskChan <- task
 }
 
-func (bs *BackSourcer) startWorkers() {
+func (bs *BackSourcer) startWorkers(l *slog.Logger) {
 	for i := 0; i < workerCount; i++ {
 		bs.wg.Add(1)
 		go func() {
 			defer bs.wg.Done()
 			for task := range bs.taskChan {
-				bs.doOriginRequest(task)
+				bs.doOriginRequest(task, l)
 			}
 		}()
 	}
 }
 
-// 核心业务逻辑：协议无关
-func (bs *BackSourcer) doOriginRequest(task *BackSourceTask) {
+func (bs *BackSourcer) doOriginRequest(task *BackSourceTask, l *slog.Logger) {
 	if task == nil {
 		return
 	}
 
-	// 通过协议接口请求
+	l.Info("doOriginRequest", slog.String("originAddr", task.OriginAddr),
+		slog.Any("UserID", task.UserID), slog.Any("port", task.Port))
+
 	resp, err := bs.protocol.DoRequest(task.OriginAddr, task.ReqData)
 	if err != nil || len(resp) == 0 {
 		return
 	}
 
-	// 处理返程 hop
+	l.Info("doOriginRequest HopIP", slog.Any("HopIP", task.HopIP))
+
 	var hops []net.IP
 	for i := len(task.HopIP) - 1; i >= 0; i-- {
 		if task.HopIP[i] == 0 {
@@ -113,8 +111,10 @@ func (bs *BackSourcer) doOriginRequest(task *BackSourceTask) {
 		hopStrs = append(hopStrs, hop.String())
 	}
 
+	l.Info("doOriginRequest response HopIP", slog.Any("HopIP", hopStrs))
+
 	routingInfo := util.PathInfo{Hops: hopStrs}
-	nextHop := hops[0] // 修正：hops[1] 会越界，这里应该是 hops[0]
+	nextHop := hops[1]
 
 	aggregator.GlobalAggResponse.AddToBatch(
 		false,

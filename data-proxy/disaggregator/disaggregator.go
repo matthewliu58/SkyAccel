@@ -7,7 +7,7 @@ import (
 
 type Disaggregator struct {
 	mu      sync.RWMutex
-	waiters map[uint32]chan []byte // userID => 等待通道
+	waiters map[uint32]chan []byte
 }
 
 var GlobalDisagg *Disaggregator
@@ -19,7 +19,6 @@ func NewDisaggregator(pre string, l *slog.Logger) *Disaggregator {
 	}
 }
 
-// Register 本协程注册自己的 chan
 func (d *Disaggregator) Register(userID uint32) (<-chan []byte, func()) {
 	ch := make(chan []byte, 1)
 
@@ -37,7 +36,6 @@ func (d *Disaggregator) Register(userID uint32) (<-chan []byte, func()) {
 	return ch, cleanup
 }
 
-// Deliver 隧道收到回包后调用：把数据丢给对应协程
 func (d *Disaggregator) Deliver(userID uint32, data []byte) {
 	d.mu.RLock()
 	ch, ok := d.waiters[userID]

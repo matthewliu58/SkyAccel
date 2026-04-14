@@ -90,10 +90,10 @@ func main() {
 	}
 
 	aggregator.GlobalAggRequest = aggregator.NewAggregator(pre, logger)
-	aggregator.GlobalAggRequest.Start()
+	aggregator.GlobalAggRequest.Start(pre, logger)
 
 	aggregator.GlobalAggResponse = aggregator.NewAggregator(pre, logger)
-	aggregator.GlobalAggResponse.Start()
+	aggregator.GlobalAggResponse.Start(pre, logger)
 
 	disaggregator.GlobalDisagg = disaggregator.NewDisaggregator(pre, logger)
 
