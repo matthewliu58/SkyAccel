@@ -13,12 +13,13 @@ const (
 )
 
 type IPInfoResult struct {
-	IP          string `json:"ip"`
-	Country     string `json:"country"`
-	CountryCode string `json:"country_code"`
-	Province    string `json:"province"`
-	City        string `json:"city"`
-	ISP         string `json:"isp"`
+	IP      string `json:"ip"`
+	Country string `json:"country"`
+	//CountryCode string `json:"country_code"`
+	Continent string `json:"continent"`
+	Province  string `json:"province"`
+	City      string `json:"city"`
+	ISP       string `json:"isp"`
 }
 
 func GetIPInfo(ip string) (*IPInfoResult, error) {

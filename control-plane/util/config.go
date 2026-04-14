@@ -2,13 +2,10 @@ package util
 
 import (
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"log/slog"
-	"math/rand"
 	"os"
 	"path/filepath"
-	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
 var Config_ *Config
@@ -60,14 +57,4 @@ func ReadYamlConfig(logger *slog.Logger) (*Config, error) {
 	}
 
 	return &config, nil
-}
-
-func GenerateRandomLetters(length int) string {
-	rand.Seed(time.Now().UnixNano())
-	letters := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	var result string
-	for i := 0; i < length; i++ {
-		result += string(letters[rand.Intn(len(letters))])
-	}
-	return result
 }

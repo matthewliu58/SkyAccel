@@ -6,6 +6,7 @@ import (
 	last "control-plane/routing/last-mile"
 	middle "control-plane/routing/middle-mile"
 	"control-plane/routing/routing"
+	"control-plane/util"
 	"log/slog"
 )
 
@@ -82,6 +83,15 @@ func LastRouting(g *graph.GraphManager, a *agg.GlobalStats, endPoints routing.En
 	pre string, logger *slog.Logger) routing.RoutingInfo {
 
 	logger.Info("LastRouting", slog.String("pre", pre), slog.Any("endPoints", endPoints))
+
+	result, err := util.GetIPInfo(endPoints.Source.IP)
+	if err != nil {
+		logger.Error("GetIPInfo error", slog.String("pre", pre), slog.Any("err", err))
+		return routing.RoutingInfo{}
+	}
+	endPoints.Source.Country = result.Country
+	endPoints.Source.City = result.City
+	endPoints.Source.Continent = result.Continent
 
 	solver := InitLastInterface(g, a, algorithm, pre, logger)
 	paths, err := solver.Operate.Computing(endPoints, pre, logger)

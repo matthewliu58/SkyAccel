@@ -31,12 +31,13 @@ func InitIPInfo(pre string, logger *slog.Logger) error {
 }
 
 type IPInfoResult struct {
-	IP          string `json:"ip"`
-	Country     string `json:"country"`
-	CountryCode string `json:"country_code"`
-	Province    string `json:"province"`
-	City        string `json:"city"`
-	ISP         string `json:"isp"`
+	IP      string `json:"ip"`
+	Country string `json:"country"`
+	//CountryCode string `json:"country_code"`
+	Continent string `json:"continent"`
+	Province  string `json:"province"`
+	City      string `json:"city"`
+	ISP       string `json:"isp"`
 	//Latitude    float64 `json:"latitude"`
 	//Longitude   float64 `json:"longitude"`
 }
@@ -53,11 +54,12 @@ func GetIPInfo(ip string, pre string, logger *slog.Logger) (IPInfoResult, error)
 	}
 
 	return IPInfoResult{
-		IP:          ip,
-		Country:     res.Country_long,
-		CountryCode: res.Country_short,
-		Province:    res.Region,
-		City:        res.City,
-		ISP:         res.Isp,
+		IP:      ip,
+		Country: res.Country_long,
+		//CountryCode: res.Country_short,
+		Continent: GetContinentByCountry(res.Country_long),
+		Province:  res.Region,
+		City:      res.City,
+		ISP:       res.Isp,
 	}, nil
 }
