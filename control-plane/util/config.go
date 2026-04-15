@@ -12,6 +12,7 @@ var Config_ *Config
 
 type Config struct {
 	//Name       string   `yaml:"name"`
+	IpLib      string     `yaml:"ip_lib"`
 	ServerList []string   `yaml:"server_list"`
 	ServerIP   string     `yaml:"server_ip"`
 	DataDir    string     `yaml:"data_dir"`
