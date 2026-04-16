@@ -85,7 +85,7 @@ func (h *NodeProbeAPIHandler) GetProbeTasks(c *gin.Context) {
 
 	pre := util.GenerateRandomLetters(5)
 
-	nodeMap, err := etcd_client.GetPrefixAll(h.etcdClient, "/routing/", pre, h.logger)
+	nodeMap, err := etcd_client.GetPrefixAll(h.etcdClient, "/routing/middle/", pre, h.logger)
 	if err != nil {
 		resp.Code = 500
 		resp.Msg = "Failed to get node information: " + err.Error()
@@ -98,7 +98,7 @@ func (h *NodeProbeAPIHandler) GetProbeTasks(c *gin.Context) {
 	ip_ := util.Config_.Node.IP.Public
 	for k, nodeJson := range nodeMap {
 		var telemetry aggregator.Telemetry
-		if err := json.Unmarshal([]byte(nodeJson), &telemetry); err != nil {
+		if err = json.Unmarshal([]byte(nodeJson), &telemetry); err != nil {
 			h.logger.Warn("Failed to parse node JSON, skipping", slog.String("pre", pre),
 				slog.String("ip", k), slog.Any("error", err))
 			continue

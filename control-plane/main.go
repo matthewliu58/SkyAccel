@@ -286,7 +286,7 @@ func main() {
 
 	logger.Info("API service started successfully", slog.String("pre", pre), slog.String("port", ":7081"))
 	if err = router.Run(":7081"); err != nil {
-		logger.Error("Failed to start API service", slog.String("pre", pre), slog.Any("err", err))
+		logger.Error("Failed to start service", slog.String("pre", pre), slog.Any("err", err))
 		return
 	}
 }
