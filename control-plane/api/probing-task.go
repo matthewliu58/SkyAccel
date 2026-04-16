@@ -115,7 +115,7 @@ func (h *NodeProbeAPIHandler) GetProbeTasks(c *gin.Context) {
 			TargetType: Node,
 			Provider:   telemetry.Provider,
 			IP:         telemetry.PublicIP,
-			Port:       8081,
+			Port:       7083,
 			Region:     telemetry.Continent,
 		})
 	}

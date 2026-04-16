@@ -147,10 +147,10 @@ func (g *GraphManager) AddNode(node *agg.Telemetry, logPre string) {
 func (g *GraphManager) DumpGraph(logPre string) {
 
 	g.logger.Info("DumpGraph", slog.String("pre", logPre))
-	for _, node := range g.GetNodes() {
+	for _, node := range g.nodes {
 		g.logger.Info("Graph Node", slog.String("pre", logPre), slog.Any("node", node))
 	}
-	for _, edge := range g.GetEdges() {
+	for _, edge := range g.edges {
 		g.logger.Info("Graph Edge", slog.String("pre", logPre), slog.Any("edge", edge))
 	}
 }
