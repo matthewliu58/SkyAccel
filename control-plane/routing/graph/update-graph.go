@@ -110,14 +110,13 @@ func (g *GraphManager) AddNode(node *agg.Telemetry, logPre string) {
 		var in, out, newLine string
 		var r float64
 
-		if v.Target.TargetType == "cloud_storage" {
+		if v.Target.TargetType == "source" {
 
 			in = node.PublicIP
 			out = v.Target.IP + ":" + strconv.Itoa(v.Target.Port)
 
 			newLine = in + "->" + out
 			r = EdgeRisk(0, v.PacketLoss, v.AverageLatency, logPre, g.logger)
-			//g.logger.Info("EdgeRisk", slog.String("pre", logPre), out+"->"+cloudFull, r)
 		} else {
 			in = node.PublicIP
 			out = v.Target.IP
@@ -148,10 +147,27 @@ func (g *GraphManager) DumpGraph(logPre string) {
 
 	g.logger.Info("DumpGraph", slog.String("pre", logPre))
 	for _, node := range g.nodes {
-		g.logger.Info("Graph Node", slog.String("pre", logPre), slog.Any("node", node))
+		g.logger.Info("Graph Node",
+			slog.String("pre", logPre),
+			slog.String("public_ip", node.PublicIP),
+			//slog.String("provider", node.Provider),
+			//slog.String("continent", node.Continent),
+			//slog.String("country", node.Country),
+			//slog.String("city", node.City),
+			slog.Float64("cpu_pressure", node.CpuPressure),
+			// slog.Int("links_count", len(node.LinksCongestion)),
+		)
 	}
-	for _, edge := range g.edges {
-		g.logger.Info("Graph Edge", slog.String("pre", logPre), slog.Any("edge", edge))
+	for key, edge := range g.edges {
+		g.logger.Info("Graph Edge",
+			slog.String("pre", logPre),
+			slog.String("edge_id", key),
+			slog.String("source_ip", edge.SourceIp),
+			slog.String("destination_ip", edge.DestinationIp),
+			//slog.Float64("latency", edge.Latency),
+			//slog.Float64("loss", edge.Loss),
+			slog.Float64("edge_weight", edge.EdgeWeight),
+		)
 	}
 }
 

@@ -18,12 +18,10 @@ import (
 
 const (
 	probeTargets = "probe-targets.json"
-	CloudStorage = "cloud_storage"
-	Node         = "node"
 )
 
 var (
-	CloudStorageMap map[int]CloudStorageTarget
+	SourceTargetMap map[int]SourceTarget
 )
 
 type NodeProbeAPIHandler struct {
@@ -31,7 +29,7 @@ type NodeProbeAPIHandler struct {
 	logger     *slog.Logger
 }
 
-type CloudStorageTarget struct {
+type SourceTarget struct {
 	ServerPort int    `json:"server_port"`
 	Provider   string `json:"provider"`
 	IP         string `json:"ip"`
@@ -40,7 +38,7 @@ type CloudStorageTarget struct {
 	ID         string `json:"id"`
 }
 
-func LoadCloudStorageTargetsFromExeDir() (map[int]CloudStorageTarget, error) {
+func LoadSourceTargetsFromExeDir() (map[int]SourceTarget, error) {
 
 	exePath, err := os.Executable()
 	if err != nil {
@@ -56,17 +54,17 @@ func LoadCloudStorageTargetsFromExeDir() (map[int]CloudStorageTarget, error) {
 		return nil, fmt.Errorf("read cloud storage targets file failed (%s): %w", targetFile, err)
 	}
 
-	var targets []CloudStorageTarget
+	var targets []SourceTarget
 	if err = json.Unmarshal(data, &targets); err != nil {
 		return nil, fmt.Errorf("unmarshal cloud storage targets failed: %w", err)
 	}
 
-	cloudStorageMap := make(map[int]CloudStorageTarget)
+	sourceTargetMap := make(map[int]SourceTarget)
 	for _, v := range targets {
-		cloudStorageMap[v.ServerPort] = v
+		sourceTargetMap[v.ServerPort] = v
 	}
 
-	return cloudStorageMap, nil
+	return sourceTargetMap, nil
 }
 
 func NewNodeProbeAPIHandler(cli *clientv3.Client, logger *slog.Logger) *NodeProbeAPIHandler {
@@ -112,7 +110,7 @@ func (h *NodeProbeAPIHandler) GetProbeTasks(c *gin.Context) {
 		}
 
 		tasks = append(tasks, model.ProbeTask{
-			TargetType: Node,
+			TargetType: "node",
 			Provider:   telemetry.Provider,
 			IP:         telemetry.PublicIP,
 			Port:       7083,
@@ -120,9 +118,9 @@ func (h *NodeProbeAPIHandler) GetProbeTasks(c *gin.Context) {
 		})
 	}
 
-	for _, v := range CloudStorageMap {
+	for _, v := range SourceTargetMap {
 		tasks = append(tasks, model.ProbeTask{
-			TargetType: CloudStorage,
+			TargetType: "source",
 			Provider:   v.Provider,
 			IP:         v.IP,
 			Port:       v.Port,

@@ -50,7 +50,7 @@ func (h *UserRoutingAPIHandler) GetMiddleRoute(c *gin.Context) {
 		h.Logger.Warn("GetMiddleRoute parse body failed", slog.String("pre", pre), slog.Any("error", err))
 		return
 	}
-	ip, ok := CloudStorageMap[req.Dest.Port]
+	ip, ok := SourceTargetMap[req.Dest.Port]
 	if !ok {
 		resp.Code = 400
 		resp.Msg = "Request body parsing failed: No corresponding port found"

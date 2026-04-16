@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	agg "control-plane/aggregator"
-	api2 "control-plane/api"
+	"control-plane/api"
 	rece "control-plane/receive-info"
 	"control-plane/routing/graph"
 	_client "control-plane/sync/etcd_client"
@@ -212,14 +212,14 @@ func main() {
 	}
 	defer cli.Close()
 
-	api2.CloudStorageMap, err = api2.LoadCloudStorageTargetsFromExeDir()
+	api.SourceTargetMap, err = api.LoadSourceTargetsFromExeDir()
 	if err != nil {
 		logger.Error("Failed to load cloud storage targets", slog.String("pre", pre),
 			slog.Any("err", err.Error()))
 		return
 	} else {
 		logger.Info("Load cloud storage targets success", slog.String("pre", pre),
-			slog.Any("targets", api2.CloudStorageMap))
+			slog.Any("targets", api.SourceTargetMap))
 	}
 
 	r := graph.NewGraphManager(logger)
@@ -279,10 +279,10 @@ func main() {
 	router := gin.Default()
 	router.GET("/health", func(c *gin.Context) { c.JSON(http.StatusOK, "success") })
 
-	api2.InitVmReceiveAPIRouter(router, s, logger)
-	api2.InitNodeProbeRouter(router, cli, logger)
-	api2.InitUserRoutingRouter(router, r, globalStats, logger)
-	api2.InitLastReceiveAPIRouter(router, cli, logger)
+	api.InitVmReceiveAPIRouter(router, s, logger)
+	api.InitNodeProbeRouter(router, cli, logger)
+	api.InitUserRoutingRouter(router, r, globalStats, logger)
+	api.InitLastReceiveAPIRouter(router, cli, logger)
 
 	logger.Info("service started successfully", slog.String("pre", pre), slog.String("port", ":7081"))
 	if err = router.Run(":7081"); err != nil {
