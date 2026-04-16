@@ -163,7 +163,7 @@ func calculateLastCongestion(pre string, logger *slog.Logger) map[LastKey]*LastC
 
 	for k, s := range agg {
 
-		s.AvgRT = float64(s.SumRT) / float64(s.Count)
+		s.AvgRT = s.SumRT / float64(s.Count)
 
 		rtList := rts[k]
 		if len(rtList) == 0 {
@@ -177,7 +177,7 @@ func calculateLastCongestion(pre string, logger *slog.Logger) map[LastKey]*LastC
 		s.P95RT = rtList[p95Idx]
 	}
 
-	logger.Info("Schedule statistics completed", slog.String("pre", pre), slog.Int("valid_records", len(valid)))
+	logger.Info("calculateLastCongestion completed", slog.String("pre", pre), slog.Int("valid_records", len(valid)))
 	for key, s := range agg {
 		logger.Info("User latency statistics",
 			slog.String("pre", pre),

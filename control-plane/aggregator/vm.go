@@ -141,6 +141,6 @@ func CalcClusterWeightedAvg(fs *util.FileStorage, interval time.Duration,
 		//etcd_client.PutKey(etcdClient, key, string(jsonData), logPre, logger)
 		_ = etcd_client.PutKeyWithLease(etcdClient, key, string(jsonData), int64(60*expireTime), pre, logger)
 
-		logger.Info("Scheduled calculation completed", slog.String("pre", pre), slog.String("data", string(jsonData)))
+		logger.Info("CalcClusterWeightedAvg completed", slog.String("pre", pre), slog.String("data", string(jsonData)))
 	}
 }
