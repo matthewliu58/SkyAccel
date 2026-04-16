@@ -223,7 +223,7 @@ func main() {
 	}
 
 	r := graph.NewGraphManager(logger)
-	nodeMap, err := _client.GetPrefixAll(cli, "/routing/middle/", pre, logger)
+	nodeMap, err := _client.GetPrefixAll(cli, "/routing-middle/", pre, logger)
 	if err != nil {
 		logger.Warn("Failed to get full prefix information", slog.String("pre", pre), slog.Any("err", err))
 	} else {
@@ -240,13 +240,13 @@ func main() {
 		}
 	}
 
-	_client.WatchPrefix(cli, "/routing/middle/",
+	_client.WatchPrefix(cli, "/routing-middle/",
 		func(eventType, key, val string, logger *slog.Logger) {
 			HandleRoutingWatchEvent(r, eventType, key, val, logger)
 		}, logger)
 
 	globalStats := agg.NewGlobalStats()
-	lastMap, err := _client.GetPrefixAll(cli, "/routing/last/", pre, logger)
+	lastMap, err := _client.GetPrefixAll(cli, "/routing-last/", pre, logger)
 	if err != nil {
 		logger.Warn("Failed to get full last statistics", slog.String("pre", pre), slog.Any("err", err))
 	} else {
@@ -261,7 +261,7 @@ func main() {
 	}
 
 	globalStats.StartAggregateWorker(logger)
-	_client.WatchPrefix(cli, "/routing/last/",
+	_client.WatchPrefix(cli, "/routing-last/",
 		func(eventType, key, val string, logger *slog.Logger) {
 			HandleLastWatchEvent(globalStats, eventType, key, val, logger)
 		}, logger)
@@ -284,7 +284,7 @@ func main() {
 	api2.InitUserRoutingRouter(router, r, globalStats, logger)
 	api2.InitLastReceiveAPIRouter(router, cli, logger)
 
-	logger.Info("API service started successfully", slog.String("pre", pre), slog.String("port", ":7081"))
+	logger.Info("service started successfully", slog.String("pre", pre), slog.String("port", ":7081"))
 	if err = router.Run(":7081"); err != nil {
 		logger.Error("Failed to start service", slog.String("pre", pre), slog.Any("err", err))
 		return

@@ -137,7 +137,7 @@ func CalcClusterWeightedAvg(fs *util.FileStorage, interval time.Duration,
 			slog.Any("data", string(jsonData)))
 
 		ip := util.Config_.Node.IP.Public
-		key := fmt.Sprintf("/routing/middle/%s", ip)
+		key := fmt.Sprintf("/routing-middle/%s", ip)
 		//etcd_client.PutKey(etcdClient, key, string(jsonData), logPre, logger)
 		_ = etcd_client.PutKeyWithLease(etcdClient, key, string(jsonData), int64(60*expireTime), pre, logger)
 

@@ -65,7 +65,7 @@ func (h *LastReceiveAPIHandler) PostLastReceive(c *gin.Context) {
 	}
 
 	ip := util.Config_.Node.IP.Public
-	key := fmt.Sprintf("/routing/last/%s", ip)
+	key := fmt.Sprintf("/routing-last/%s", ip)
 	if err = etcd_client.PutKeyWithLease(h.etcdCli, key, string(reqDataBytes), int64(60*lastExpireTime), pre, h.logger); err != nil {
 		h.logger.Error("Failed to store LastStats to etcd", slog.String("pre", pre), slog.Any("error", err))
 	}

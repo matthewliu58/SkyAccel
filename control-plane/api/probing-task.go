@@ -83,14 +83,17 @@ func (h *NodeProbeAPIHandler) GetProbeTasks(c *gin.Context) {
 		Data: nil,
 	}
 
-	pre := util.GenerateRandomLetters(5)
+	pre := c.Query("node")
+	if pre == "" {
+		pre = util.GenerateRandomLetters(5)
+	}
 
-	nodeMap, err := etcd_client.GetPrefixAll(h.etcdClient, "/routing/middle/", pre, h.logger)
+	nodeMap, err := etcd_client.GetPrefixAll(h.etcdClient, "/routing-middle/", pre, h.logger)
 	if err != nil {
 		resp.Code = 500
 		resp.Msg = "Failed to get node information: " + err.Error()
 		c.JSON(http.StatusOK, resp)
-		h.logger.Error(resp.Msg)
+		h.logger.Error(resp.Msg, slog.String("pre", pre))
 		return
 	}
 
