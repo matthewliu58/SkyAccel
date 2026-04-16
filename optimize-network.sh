@@ -136,14 +136,15 @@ echo "\n==> Optimizing firewall settings"
 # Check if ufw is installed
 if command -v ufw &> /dev/null; then
     echo "Configuring ufw for better performance"
-    sudo ufw --force enable
-    sudo ufw default deny incoming
-    sudo ufw default allow outgoing
+    # Add timeout to prevent hanging
+    timeout 30s sudo ufw --force enable || echo "Warning: Failed to enable ufw (timeout)"
+    timeout 30s sudo ufw default deny incoming || echo "Warning: Failed to set default deny incoming (timeout)"
+    timeout 30s sudo ufw default allow outgoing || echo "Warning: Failed to set default allow outgoing (timeout)"
     # Allow necessary ports
-    sudo ufw allow 4433/tcp  # QUIC port
-    sudo ufw allow 7095/tcp  # API port
-    sudo ufw allow 8080/tcp  # Control plane port
-    sudo ufw reload
+    timeout 30s sudo ufw allow 4433/tcp  # QUIC port
+    timeout 30s sudo ufw allow 7095/tcp  # API port
+    timeout 30s sudo ufw allow 8080/tcp  # Control plane port
+    timeout 30s sudo ufw reload || echo "Warning: Failed to reload ufw (timeout)"
 fi
 
 # ===== Verification =====
