@@ -201,16 +201,18 @@ func handleUDPConnection(
 
 	nextHop := util.HopIPToNet(pathInfo.Hops[1])
 
-	var routingKey, portStr string
+	var hops []string
+	port_ := ""
 	for _, h := range pathInfo.Hops {
-		if idx := strings.Index(h, ":"); idx != -1 {
-			portStr = h[idx+1:]
-			h = h[:idx]
+		if strings.Contains(h, ":") {
+			t := strings.Split(h, ":")
+			h = t[0]
+			port_ = t[1]
 		}
-		routingKey += "," + h
+		hops = append(hops, h)
 	}
-
-	p64, _ := strconv.ParseUint(portStr, 10, 16)
+	routingKey := strings.Join(hops, ",")
+	p64, _ := strconv.ParseUint(port_, 10, 16)
 
 	waitCh, cleanup := disaggregator.GlobalDisagg.Register(reqID)
 	defer cleanup()

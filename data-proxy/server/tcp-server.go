@@ -206,15 +206,17 @@ func handleConnection(conn net.Conn, port int, a, l *slog.Logger) {
 	userID := util.GenShortReqID(clientIP)
 	nextHop := util.HopIPToNet(pathInfo.Hops[1])
 
-	routingKey := ""
+	var hops []string
 	port_ := ""
 	for _, h := range pathInfo.Hops {
 		if strings.Contains(h, ":") {
-			h = h[strings.Index(h, ":"):]
-			port_ = h[:strings.Index(h, ":")]
+			t := strings.Split(h, ":")
+			h = t[0]
+			port_ = t[1]
 		}
-		routingKey = routingKey + "," + h
+		hops = append(hops, h)
 	}
+	routingKey := strings.Join(hops, ",")
 	p64, _ := strconv.ParseUint(port_, 10, 16)
 
 	waitCh, cleanup := disaggregator.GlobalDisagg.Register(userID)

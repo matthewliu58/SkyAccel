@@ -204,6 +204,7 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 		b.pkt.SetHopPos(1)
 
 		w.batches[msg.routingKey] = b
+		w.logger.Info("create batch", "routingKey", b.RoutingKey, "nextHop", b.NextHop.String())
 	}
 
 	if msg.emerge {
@@ -221,6 +222,8 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 		b.inHeap = false
 		b.pkt.AppendUserPacket(msg.userID, msg.data)
 	}
+	w.logger.Info("add packet success", "routingKey", b.RoutingKey,
+		"nextHop", b.NextHop.String(), "payloadLen", b.pkt.PayloadLen)
 
 	if !b.inHeap {
 		w.logger.Info("add to heap", "routingKey", b.RoutingKey, "nextHop", b.NextHop.String())
@@ -239,6 +242,9 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 }
 
 func (w *worker) checkTimeout() {
+
+	w.logger.Info("checkTimeout")
+
 	var toSend []*Batch
 
 	w.mu.Lock()
@@ -249,7 +255,7 @@ func (w *worker) checkTimeout() {
 		if item.deadline.After(now) {
 			break
 		}
-
+		w.logger.Info("checkTimeout", "routingKey", item.batch.RoutingKey, "nextHop", item.batch.NextHop.String())
 		heap.Pop(&w.heap)
 		item.batch.inHeap = false
 		toSend = append(toSend, item.batch)
@@ -263,6 +269,9 @@ func (w *worker) checkTimeout() {
 }
 
 func (w *worker) flush(b *Batch, buffSize int) {
+
+	w.logger.Info("flush batch", "routingKey", b.RoutingKey, "nextHop", b.NextHop.String(), "payloadLen", b.pkt.PayloadLen)
+
 	if b.closed || b.pkt == nil || b.pkt.PayloadLen == 0 {
 		return
 	}
@@ -280,6 +289,9 @@ func (w *worker) flush(b *Batch, buffSize int) {
 }
 
 func (w *worker) evictStaleBatches() {
+
+	w.logger.Info("evictStaleBatches")
+	
 	now := time.Now()
 
 	w.mu.RLock()
