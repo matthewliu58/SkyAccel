@@ -38,8 +38,8 @@ type LastCongestion struct {
 var (
 	mu           sync.RWMutex
 	records      []Record
-	window       = 15 * time.Second
-	tickInterval = 10 * time.Second
+	tickInterval = 20 * time.Second
+	window       = tickInterval + 5*time.Second
 )
 
 func LastTelemetryReporter(pre string, logger *slog.Logger) {
