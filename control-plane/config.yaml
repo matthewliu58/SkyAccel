@@ -3,16 +3,16 @@ port: "7081"
 ip_lib: "http://127.0.0.1:7082"
 
 server_list:
-  - "202.182.96.202"
-server_ip: "202.182.96.202"
+  - "141.164.55.197"
+server_ip: "141.164.55.197"
 data_dir: "/root/etcd"
 #name: "etcd-1"
 
 node:
   provider: "Vultr"
   continent: "Asia"
-  country: "Japan"
-  city: "Tokyo"
+  country: "Korea"
+  city: "Seoul"
   ip:
     private: "0.0.0.0"
-    public: "202.182.96.202"
+    public: "141.164.55.197"
