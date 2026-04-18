@@ -75,7 +75,7 @@ func (h *MinHeap) Pop() any {
 }
 
 type worker struct {
-	batches map[string]*Batch
+	batches map[string][]*Batch
 	heap    MinHeap
 	mu      sync.RWMutex
 	logger  *slog.Logger
@@ -101,7 +101,7 @@ func NewAggregator(pre string, l *slog.Logger) *Aggregator {
 
 	for i := 0; i < workerCount; i++ {
 		agg.workers[i] = &worker{
-			batches: make(map[string]*Batch),
+			batches: make(map[string][]*Batch),
 			heap:    make(MinHeap, 0),
 			logger:  l.With("worker", i),
 			stopCh:  make(chan struct{}),
@@ -199,28 +199,56 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 	}
 
 	w.mu.RLock()
-	b := w.batches[msg.routingKey]
+	bList := w.batches[msg.routingKey]
+	var b *Batch = nil
+	lList := len(bList)
+	if lList <= 1 {
+		b = bList[0]
+	} else {
+		idx := int(msg.userID) % lList
+		b = bList[idx]
+	}
 	w.mu.RUnlock()
 
 	if b == nil {
 		w.mu.Lock()
-		b = w.batches[msg.routingKey]
-		if b == nil {
-			b = &Batch{
-				BuffSize:   buffSize,
-				RoutingKey: msg.routingKey,
-				NextHop:    msg.nextHop,
-				pkt:        packet.NewPacket(buffSize),
-				createTime: time.Now(),
+		var ok bool
+		bList, ok = w.batches[msg.routingKey]
+		if !ok {
+
+			num, ok_ := config.BatchNumMap[msg.port]
+			if !ok_ {
+				num = 1
 			}
-			for i, h := range msg.routingInfo.Hops {
-				b.pkt.SetHopIP(i, util.HopIPToNet(h))
+
+			for i := 0; i < num; i++ {
+				b_ := &Batch{
+					BuffSize:   buffSize,
+					RoutingKey: msg.routingKey,
+					NextHop:    msg.nextHop,
+					pkt:        packet.NewPacket(buffSize),
+					createTime: time.Now(),
+				}
+				for i, h := range msg.routingInfo.Hops {
+					b_.pkt.SetHopIP(i, util.HopIPToNet(h))
+				}
+				b_.pkt.SetPort(msg.port)
+				b_.pkt.SetHopPos(1)
+				w.batches[msg.routingKey] = append(w.batches[msg.routingKey], b_)
+				w.logger.Info("create batch", "routingKey", b_.RoutingKey, "nextHop", b_.NextHop.String())
 			}
-			b.pkt.SetPort(msg.port)
-			b.pkt.SetHopPos(1)
-			w.batches[msg.routingKey] = b
-			w.logger.Info("create batch", "routingKey", b.RoutingKey, "nextHop", b.NextHop.String())
+			
 		}
+
+		bList, _ = w.batches[msg.routingKey]
+		lList = len(bList)
+		if lList <= 1 {
+			b = bList[0]
+		} else {
+			idx := int(msg.userID) % lList
+			b = bList[idx]
+		}
+
 		w.mu.Unlock()
 	}
 
@@ -332,12 +360,16 @@ func (w *worker) evictStaleBatches() {
 
 	for _, key := range keys {
 		w.mu.RLock()
-		b, exist := w.batches[key]
+		bList, exist := w.batches[key]
 		w.mu.RUnlock()
 		if !exist {
 			continue
 		}
+		if len(bList) > 1 {
+			continue
+		}
 
+		b := bList[0]
 		b.mu.RLock()
 		stale := now.Sub(b.createTime) > batchMaxAge
 		b.mu.RUnlock()

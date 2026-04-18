@@ -12,6 +12,7 @@ import (
 var (
 	Config_     *Config
 	TestPathMap = make(map[int]string)
+	BatchNumMap = make(map[uint16]int)
 )
 
 type Config struct {
@@ -43,8 +44,9 @@ type NodeIP struct {
 }
 
 type Listener struct {
-	Proto string `yaml:"proto"` // tcp / udp
-	Port  int    `yaml:"port"`
+	Proto    string `yaml:"proto"` // tcp / udp
+	Port     int    `yaml:"port"`
+	BatchNum int    `yaml:"batch_num"`
 }
 
 type RateLimit struct {
@@ -88,6 +90,12 @@ func ReadYamlConfig(logger *slog.Logger) (*Config, error) {
 		testPathMap[v.Port] = v.Path
 	}
 	TestPathMap = testPathMap
+
+	batchNumMap := make(map[uint16]int)
+	for _, v := range config.Listeners {
+		batchNumMap[uint16(v.Port)] = v.BatchNum
+	}
+	BatchNumMap = batchNumMap
 
 	return &config, nil
 }
