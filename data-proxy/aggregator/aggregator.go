@@ -30,13 +30,14 @@ type aggregatorMsg struct {
 }
 
 type Batch struct {
+	mu         sync.RWMutex // 🔥 读写锁
 	BuffSize   int
 	RoutingKey string
 	NextHop    net.IP
 	pkt        *packet.Packet
 	closed     bool
 	inHeap     bool
-	heapItem   *HeapItem // Reference to the heap item for this batch
+	heapItem   *HeapItem
 	createTime time.Time
 }
 
@@ -91,7 +92,6 @@ var GlobalAggRequest *Aggregator
 var GlobalAggResponse *Aggregator
 
 func NewAggregator(pre string, l *slog.Logger) *Aggregator {
-
 	l.Info("NewAggregator", "pre", pre)
 
 	agg := &Aggregator{
@@ -107,44 +107,41 @@ func NewAggregator(pre string, l *slog.Logger) *Aggregator {
 			stopCh:  make(chan struct{}),
 		}
 	}
-
 	return agg
 }
 
 func (a *Aggregator) Start(pre string, l *slog.Logger) {
-
 	l.Info("Aggregator Start", "pre", pre)
 
 	for _, w := range a.workers {
-
 		a.wg.Add(1)
-		go func() {
+		go func(ww *worker) {
 			defer a.wg.Done()
 			for msg := range a.inputChan {
-				w.handleMsg(msg)
+				ww.handleMsg(msg)
 			}
-		}()
+		}(w)
 
 		a.wg.Add(1)
-		go func() {
+		go func(ww *worker) {
 			defer a.wg.Done()
-			ticker := time.NewTicker(1 * time.Millisecond)
+			ticker := time.NewTicker(5 * time.Millisecond)
 			defer ticker.Stop()
 			for range ticker.C {
-				w.checkTimeout()
+				ww.checkTimeout()
 			}
-		}()
+		}(w)
 
 		a.wg.Add(1)
-		go func(w *worker) {
+		go func(ww *worker) {
 			defer a.wg.Done()
 			ticker := time.NewTicker(10 * time.Second)
 			defer ticker.Stop()
 			for {
 				select {
 				case <-ticker.C:
-					w.evictStaleBatches()
-				case <-w.stopCh:
+					ww.evictStaleBatches()
+				case <-ww.stopCh:
 					return
 				}
 			}
@@ -178,11 +175,9 @@ type sendInfo struct {
 }
 
 func (w *worker) handleMsg(msg *aggregatorMsg) {
-	var toSend []sendInfo
+	w.logger.Info("handleMsg", "routingKey", msg.routingKey,
+		"nextHop", msg.nextHop.String(), "payloadLen", len(msg.data))
 
-	w.logger.Info("handleMsg", "routingKey", msg.routingKey, "nextHop", msg.nextHop.String(), "payloadLen", len(msg.data))
-
-	//todo select these two variables by characteristics of business
 	buffSize := config.Config_.Aggregator.BufferSize
 	batchTimeout := time.Duration(config.Config_.Aggregator.BatchTimeoutMs) * time.Millisecond
 
@@ -203,43 +198,55 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 		return
 	}
 
-	w.mu.Lock()
-
+	w.mu.RLock()
 	b := w.batches[msg.routingKey]
+	w.mu.RUnlock()
+
 	if b == nil {
-		b = &Batch{
-			BuffSize:   buffSize,
-			RoutingKey: msg.routingKey,
-			NextHop:    msg.nextHop,
-			pkt:        packet.NewPacket(buffSize),
-			createTime: time.Now(),
-			inHeap:     false,
+		w.mu.Lock()
+		b = w.batches[msg.routingKey]
+		if b == nil {
+			b = &Batch{
+				BuffSize:   buffSize,
+				RoutingKey: msg.routingKey,
+				NextHop:    msg.nextHop,
+				pkt:        packet.NewPacket(buffSize),
+				createTime: time.Now(),
+				inHeap:     false,
+			}
+			for i, h := range msg.routingInfo.Hops {
+				b.pkt.SetHopIP(i, util.HopIPToNet(h))
+			}
+			b.pkt.SetPort(msg.port)
+			b.pkt.SetHopPos(1)
+			w.batches[msg.routingKey] = b
+			w.logger.Info("create batch", "routingKey", b.RoutingKey, "nextHop", b.NextHop.String())
 		}
-
-		for i, h := range msg.routingInfo.Hops {
-			b.pkt.SetHopIP(i, util.HopIPToNet(h))
-		}
-		b.pkt.SetPort(msg.port)
-		b.pkt.SetHopPos(1)
-
-		w.batches[msg.routingKey] = b
-		w.logger.Info("create batch", "routingKey", b.RoutingKey, "nextHop", b.NextHop.String())
+		w.mu.Unlock()
 	}
 
+	b.mu.Lock()
+	var toSend []sendInfo
 	ok := b.pkt.AppendUserPacket(msg.userID, msg.data)
 	if !ok {
-		if b.inHeap {
-			// Remove from heap
+
+		if b.inHeap && b.heapItem != nil {
+
+			w.mu.Lock()
 			heap.Remove(&w.heap, b.heapItem.index)
+			w.mu.Unlock()
+
 			b.heapItem = nil
 		}
+
 		toSend = append(toSend, sendInfo{b.pkt, b.NextHop})
-		b.pkt = packet.NewPacket(buffSize)
+		b.pkt = packet.NewPacket(b.BuffSize)
 		b.createTime = time.Now()
 		b.inHeap = false
-		b.heapItem = nil // Reset heap item reference
+		b.heapItem = nil
 		b.pkt.AppendUserPacket(msg.userID, msg.data)
 	}
+
 	w.logger.Info("add packet success", "routingKey", b.RoutingKey,
 		"nextHop", b.NextHop.String(), "payloadLen", b.pkt.PayloadLen)
 
@@ -249,12 +256,15 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 			batch:    b,
 			deadline: time.Now().Add(batchTimeout),
 		}
-		heap.Push(&w.heap, item)
-		b.inHeap = true
-		b.heapItem = item // Store heap item reference
-	}
 
-	w.mu.Unlock()
+		w.mu.Lock()
+		heap.Push(&w.heap, item)
+		w.mu.Unlock()
+
+		b.inHeap = true
+		b.heapItem = item
+	}
+	b.mu.Unlock()
 
 	for _, p := range toSend {
 		w.flush(p.p, p.next)
@@ -262,26 +272,27 @@ func (w *worker) handleMsg(msg *aggregatorMsg) {
 }
 
 func (w *worker) checkTimeout() {
-
 	var toSend []sendInfo
 
 	w.mu.Lock()
-
 	now := time.Now()
 	for w.heap.Len() > 0 {
+
 		item := w.heap[0]
 		if item.deadline.After(now) {
 			break
 		}
-		w.logger.Info("checkTimeout", "routingKey", item.batch.RoutingKey, "nextHop", item.batch.NextHop.String())
 		heap.Pop(&w.heap)
-		item.batch.inHeap = false
-		item.batch.heapItem = nil // Reset heap item reference
-		toSend = append(toSend, sendInfo{item.batch.pkt, item.batch.NextHop})
-		item.batch.pkt = packet.NewPacket(item.batch.BuffSize)
-		item.batch.createTime = time.Now()
-	}
+		b := item.batch
 
+		b.mu.Lock()
+		toSend = append(toSend, sendInfo{b.pkt, b.NextHop})
+		b.pkt = packet.NewPacket(b.BuffSize)
+		b.createTime = now
+		b.inHeap = false
+		b.heapItem = nil
+		b.mu.Unlock()
+	}
 	w.mu.Unlock()
 
 	for _, p := range toSend {
@@ -290,7 +301,6 @@ func (w *worker) checkTimeout() {
 }
 
 func (w *worker) flush(p *packet.Packet, nextHop net.IP) {
-
 	w.logger.Info("flush batch", slog.Any("port", p.Port), slog.Any("nextHop", nextHop.String()))
 
 	if p == nil || p.PayloadLen == 0 {
@@ -310,7 +320,6 @@ func (w *worker) flush(p *packet.Packet, nextHop net.IP) {
 }
 
 func (w *worker) evictStaleBatches() {
-
 	now := time.Now()
 
 	w.mu.RLock()
@@ -330,7 +339,11 @@ func (w *worker) evictStaleBatches() {
 			continue
 		}
 
-		if now.Sub(b.createTime) <= batchMaxAge {
+		b.mu.RLock()
+		isStale := now.Sub(b.createTime) > batchMaxAge
+		b.mu.RUnlock()
+
+		if !isStale {
 			continue
 		}
 
