@@ -41,11 +41,13 @@ func GetRoutingFromControlPlane(port int, l *slog.Logger) *util.RoutingInfo {
 	if len(config.TestPathMap) > 0 {
 		if path, ok := config.TestPathMap[port]; ok {
 			hops := strings.Split(path, ",")
-			l.Info("Using local test routing", slog.Int("port", port), slog.Any("hops", hops))
-			return &util.RoutingInfo{
-				Routing: []util.PathInfo{
-					{Hops: hops},
-				},
+			if len(hops) >= 2 && hops[0] == config.Config_.Node.IP.Public {
+				l.Info("Using local test routing", slog.Int("port", port), slog.Any("hops", hops))
+				return &util.RoutingInfo{
+					Routing: []util.PathInfo{
+						{Hops: hops},
+					},
+				}
 			}
 		}
 	}

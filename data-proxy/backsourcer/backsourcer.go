@@ -83,8 +83,8 @@ func (bs *BackSourcer) doOriginRequest(task *BackSourceTask, l *slog.Logger) {
 		return
 	}
 
-	l.Info("doOriginRequest", slog.Any("UserID", task.UserID), slog.String("originAddr", task.OriginAddr),
-		slog.Any("port", task.Port), slog.Any("req HopIP", task.HopIP))
+	l.Info("doOriginRequest", slog.Any("UserID", task.UserID),
+		slog.String("originAddr", task.OriginAddr), slog.Any("port", task.Port))
 
 	resp, err := bs.protocol.DoRequest(task.OriginAddr, task.ReqData)
 	if err != nil || len(resp) == 0 {
@@ -111,8 +111,8 @@ func (bs *BackSourcer) doOriginRequest(task *BackSourceTask, l *slog.Logger) {
 	}
 	routingKey = strings.Join(hopStrs, ",")
 
-	l.Info("doOriginRequest response", slog.Any("UserID", task.UserID), slog.String("originAddr", task.OriginAddr),
-		slog.Any("resp", len(resp)), slog.Any("response HopIP", hopStrs))
+	l.Info("doOriginRequest response", slog.Any("UserID", task.UserID),
+		slog.String("originAddr", task.OriginAddr), slog.Any("response HopIP", hopStrs))
 
 	routingInfo := util.PathInfo{Hops: hopStrs}
 	nextHop := hops[1]

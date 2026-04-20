@@ -166,18 +166,18 @@ func handleConnection(conn net.Conn, port int, a, l *slog.Logger) {
 	var routeInfo *util.RoutingInfo
 	if !hasRoute {
 		routeInfo = GetRoutingFromControlPlane(port, l)
-
-		routingMutex.Lock()
-		routingMap[port] = routingInfo{
-			info:     routeInfo,
-			deadline: time.Now().Add(routeTimeout),
+		if routeInfo != nil {
+			routingMutex.Lock()
+			routingMap[port] = routingInfo{
+				info:     routeInfo,
+				deadline: time.Now().Add(routeTimeout),
+			}
+			routingMutex.Unlock()
 		}
-		routingMutex.Unlock()
 	} else if time.Now().After(ri.deadline) {
 		routeInfo = ri.info
 		go func() {
 			routeInfo = GetRoutingFromControlPlane(port, l)
-
 			routingMutex.Lock()
 			routingMap[port] = routingInfo{
 				info:     routeInfo,
