@@ -166,8 +166,20 @@ func (ks *KShortestSolver) findShortestPath(start, end string, graph_ map[string
 
 	dist := make(map[string]float64)
 	prev := make(map[string]string)
+	// Initialize all nodes in graph (including destination-only nodes)
+	allNodes := make(map[string]bool)
 	for node := range graph_ {
 		dist[node] = math.Inf(1)
+		allNodes[node] = true
+	}
+	// Also add destination nodes that may not have outgoing edges
+	for _, edges := range graph_ {
+		for _, e := range edges {
+			if !allNodes[e.DestinationIp] {
+				dist[e.DestinationIp] = math.Inf(1)
+				allNodes[e.DestinationIp] = true
+			}
+		}
 	}
 	dist[start] = 0
 

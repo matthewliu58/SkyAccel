@@ -132,6 +132,11 @@ func (d *HeuristicSolver) buildResidualGraph() map[string]map[string]bool {
 
 // 找一条可行路径（简单DFS）
 func (d *HeuristicSolver) findFeasiblePath(g map[string]map[string]bool, s, t string) []string {
+	// Check if start node exists in graph
+	if _, ok := g[s]; !ok {
+		return nil
+	}
+
 	visited := make(map[string]bool)
 	path := []string{}
 	var dfs func(string) bool
@@ -163,6 +168,11 @@ func (d *HeuristicSolver) findFeasiblePath(g map[string]map[string]bool, s, t st
 
 // 禁用整条路径（流量占用）
 func (d *HeuristicSolver) banPath(g map[string]map[string]bool, path []string) {
+	// For single-node paths (start == end), remove the node entry to prevent re-finding
+	if len(path) <= 1 {
+		delete(g, path[0])
+		return
+	}
 	for i := 0; i < len(path)-1; i++ {
 		from := path[i]
 		to := path[i+1]

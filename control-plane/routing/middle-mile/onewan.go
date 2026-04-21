@@ -46,7 +46,7 @@ func (os *ONEWANSolver) Computing(start, end, pre string, logger *slog.Logger) (
 	}
 
 	// 1. Generate candidate paths using max flow approach
-	candidates, err := os.maxFlowPaths(start, end, graph_, 10, logger)
+	candidates, err := os.maxFlowPaths(start, end, graph_, os.maxPaths, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -58,9 +58,12 @@ func (os *ONEWANSolver) Computing(start, end, pre string, logger *slog.Logger) (
 	// 2. Apply diversity filter
 	filtered := os.diversityFilter(candidates)
 
-	// 3. Select all filtered paths (focus on path count)
+	// 3. Select paths up to maxPaths
 	var selectedPaths []routing.PathInfo
-	for _, path := range filtered {
+	for i, path := range filtered {
+		if i >= os.maxPaths {
+			break
+		}
 		selectedPaths = append(selectedPaths, path)
 	}
 
@@ -163,8 +166,13 @@ func (g *DinicGraph) maxFlow(start, end string) float64 {
 }
 
 func (g *DinicGraph) findPath(start, end string, visited map[string]bool) []string {
+	// Check if start node exists in the graph
+	if _, ok := g.adj[start]; !ok {
+		return nil
+	}
+
 	if start == end {
-		return []string{end}
+		return []string{start}
 	}
 
 	visited[start] = true
@@ -182,6 +190,12 @@ func (g *DinicGraph) findPath(start, end string, visited map[string]bool) []stri
 // maxFlowPaths generates multiple candidate paths using a max flow approach
 func (os *ONEWANSolver) maxFlowPaths(start, end string, graph_ map[string][]*graph.Edge, maxCandidates int, logger *slog.Logger) ([]routing.PathInfo, error) {
 	var candidates []routing.PathInfo
+
+	// Handle start == end case: single node path
+	if start == end {
+		cost := os.calculatePathCost([]string{start}, graph_)
+		return []routing.PathInfo{{Hops: []string{start}, Rtt: cost}}, nil
+	}
 
 	// Build Dinic graph
 	dinicGraph := NewDinicGraph()
