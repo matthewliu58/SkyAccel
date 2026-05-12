@@ -40,7 +40,7 @@ var (
 func InitServerInterface(protocol string, pre string, logger *slog.Logger) ServerInterface {
 	switch protocol {
 	case "tcp":
-		return ServerInterface{Operate: NewTCPServer()}
+		return ServerInterface{Operate: NewTCPServer(false, 0)}
 	case "udp":
 		return ServerInterface{Operate: NewUDPServer()}
 	default:

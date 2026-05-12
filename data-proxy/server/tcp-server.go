@@ -14,12 +14,15 @@ import (
 )
 
 type TCPServer struct {
-	protocol string
+	protocol      string
+	keepAlive     bool
+	keepAliveTime time.Duration
 }
 
 var (
-	accessLogMap sync.Map
-	accessWindow = 5 * time.Second
+	accessLogMap         sync.Map
+	accessWindow         = 5 * time.Second
+	defaultKeepAliveTime = 5 * time.Minute
 )
 
 func shouldLogAccess(clientIP string) bool {
@@ -40,9 +43,14 @@ func shouldLogAccess(clientIP string) bool {
 	return false
 }
 
-func NewTCPServer() *TCPServer {
+func NewTCPServer(keepAlive bool, keepAliveTime time.Duration) *TCPServer {
+	if keepAliveTime == 0 {
+		keepAliveTime = defaultKeepAliveTime
+	}
 	return &TCPServer{
-		protocol: "tcp",
+		protocol:      "tcp",
+		keepAlive:     keepAlive,
+		keepAliveTime: keepAliveTime,
 	}
 }
 
@@ -77,7 +85,11 @@ func (t *TCPServer) StartServerRun(port int, access *slog.Logger, req string, l 
 			l.Error("accept failed", slog.String("req", req), slog.Any("err", err))
 			continue
 		}
-		go handleConnection(conn, port, access, l)
+		if t.keepAlive {
+			go handleConnectionKeepAlive(conn, port, access, l, t)
+		} else {
+			go handleConnection(conn, port, access, l)
+		}
 	}
 }
 
@@ -236,5 +248,142 @@ func handleConnection(conn net.Conn, port int, a, l *slog.Logger) {
 
 	case <-time.After(proxyTimeout):
 		l.Error("wait response timeout", slog.Any("req_id", reqID))
+	}
+}
+
+func handleConnectionKeepAlive(conn net.Conn, port int, a, l *slog.Logger, server *TCPServer) {
+	defer func() { _ = conn.Close() }()
+
+	clientAddr := conn.RemoteAddr().(*net.TCPAddr)
+	clientIP := clientAddr.IP.String()
+
+	if globalRL != nil && !globalRL.Allow(port, clientIP) {
+		l.Warn("rate limit exceeded", slog.String("client_ip", clientIP), slog.Int("port", port))
+		return
+	}
+
+	reqID := util.GenShortReqID(clientIP)
+	l.Info("new connection (keep-alive)", slog.String("client_ip", clientIP),
+		slog.String("protocol", "tcp"), slog.Int("port", port), slog.Any("req_id", reqID),
+		slog.Duration("keep_alive_time", server.keepAliveTime))
+
+	connStart := time.Now()
+	connDeadline := connStart.Add(server.keepAliveTime)
+
+	for {
+		_ = conn.SetReadDeadline(connDeadline)
+		start := time.Now()
+		data, err := io.ReadAll(conn)
+		rtMs := float64(time.Since(start).Microseconds()) / 1000
+
+		if err != nil {
+			if err == io.EOF {
+				l.Info("client closed connection", slog.String("client_ip", clientIP),
+					slog.Duration("conn_duration", time.Since(connStart)))
+			} else {
+				l.Error("read failed", slog.Any("req_id", reqID), slog.String("client_ip", clientIP), slog.Any("err", err))
+			}
+			return
+		}
+
+		if len(data) == 0 {
+			l.Info("client sent empty request, closing connection", slog.String("client_ip", clientIP))
+			return
+		}
+
+		go func(reqData []byte, currentReqID uint32) {
+			if shouldLogAccess(clientIP) {
+				a.Info("access", slog.Any("req_id", currentReqID), slog.String("client_ip", clientIP),
+					slog.Float64("conn_rt_ms", rtMs), slog.Int("data_len", len(reqData)))
+			}
+		}(data, reqID)
+
+		routingMutex.RLock()
+		ri, hasRoute := routingMap[port]
+		routingMutex.RUnlock()
+
+		var routeInfo *util.RoutingInfo
+		if !hasRoute {
+			routeInfo = GetRoutingFromControlPlane(port, l)
+			if routeInfo != nil {
+				routingMutex.Lock()
+				routingMap[port] = routingInfo{
+					info:     routeInfo,
+					deadline: time.Now().Add(routeTimeout),
+				}
+				routingMutex.Unlock()
+			}
+		} else if time.Now().After(ri.deadline) {
+			routeInfo = ri.info
+			go func() {
+				routeInfo = GetRoutingFromControlPlane(port, l)
+				routingMutex.Lock()
+				routingMap[port] = routingInfo{
+					info:     routeInfo,
+					deadline: time.Now().Add(routeTimeout),
+				}
+				routingMutex.Unlock()
+			}()
+		} else {
+			routeInfo = ri.info
+		}
+
+		if len(routeInfo.Routing) == 0 {
+			l.Error("no path in routing info", slog.Any("req_id", reqID))
+			return
+		}
+		pathInfo := routeInfo.Routing[0]
+
+		if len(pathInfo.Hops) <= 2 {
+			originAddr := pathInfo.Hops[len(pathInfo.Hops)-1]
+			if ok := directOriginProxy(conn, originAddr, data, reqID, l); !ok {
+				l.Error("direct origin proxy failed", slog.Any("req_id", reqID))
+			}
+		} else {
+			userID := util.GenShortReqID(clientIP)
+			nextHop := util.HopIPToNet(pathInfo.Hops[1])
+
+			var hops []string
+			port_ := ""
+			for _, h := range pathInfo.Hops {
+				if strings.Contains(h, ":") {
+					t := strings.Split(h, ":")
+					h = t[0]
+					port_ = t[1]
+				}
+				hops = append(hops, h)
+			}
+			routingKey := strings.Join(hops, ",")
+			p64, _ := strconv.ParseUint(port_, 10, 16)
+
+			waitCh, cleanup := disaggregator.GlobalDisagg.Register(userID)
+
+			pathInfo_ := util.PathInfo{Hops: hops}
+			aggregator.GlobalAggRequest.AddToBatch(false, routingKey, "tcp", uint16(p64), pathInfo_, nextHop, userID, data)
+
+			select {
+			case respData, ok := <-waitCh:
+				cleanup()
+				if !ok {
+					l.Error("wait chan closed", slog.Any("req_id", reqID))
+					return
+				}
+				_ = conn.SetWriteDeadline(time.Now().Add(proxyTimeout))
+				_, _ = conn.Write(respData)
+				l.Info("aggregated proxy response sent", slog.Any("req_id", reqID))
+
+			case <-time.After(proxyTimeout):
+				cleanup()
+				l.Error("wait response timeout", slog.Any("req_id", reqID))
+			}
+		}
+
+		reqID = util.GenShortReqID(clientIP)
+
+		if time.Now().After(connDeadline) {
+			l.Info("connection keep-alive timeout", slog.String("client_ip", clientIP),
+				slog.Duration("conn_duration", time.Since(connStart)))
+			return
+		}
 	}
 }
