@@ -268,8 +268,10 @@ func (w *worker) handleMsg(msg *aggregatorMsg, logger *slog.Logger) {
 	if b != nil {
 
 		b.mu.Lock()
-		if b.heapItem == nil ||
+		if (b.heapItem == nil && b.pkt.Wp > packet.HeaderSize) ||
 			!b.pkt.AppendUserPacket(msg.userID, msg.data) {
+
+			b.mu.Unlock()
 
 			b_ := &Batch{
 				BuffSize:   buffSize,
@@ -285,11 +287,13 @@ func (w *worker) handleMsg(msg *aggregatorMsg, logger *slog.Logger) {
 			b_.pkt.SetProtocol(msg.protocol)
 			b_.pkt.SetHopPos(1)
 
+			b = b_
+			b.mu.Lock()
+
 			w.mu.Lock()
 			w.batches[msg.routingKey] = append(w.batches[msg.routingKey], b_)
 			w.mu.Unlock()
 
-			b = b_
 			b.pkt.AppendUserPacket(msg.userID, msg.data)
 		}
 		logger.Info("add packet", slog.Int("workId", w.id), slog.Any("userID", msg.userID))
@@ -321,7 +325,7 @@ func (w *worker) checkTimeout(logger *slog.Logger) {
 			break
 		}
 		popItem := heap.Pop(&w.heap).(*HeapItem)
-		popItem.batch.heapItem = nil
+		//popItem.batch.heapItem = nil
 		expired = append(expired, popItem)
 	}
 	w.mu.Unlock()
