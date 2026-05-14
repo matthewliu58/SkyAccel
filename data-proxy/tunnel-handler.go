@@ -59,7 +59,7 @@ func HandleQUICPacket(remoteAddr string, pkt []byte, l *slog.Logger) {
 			originAddr := net.JoinHostPort(originIP.String(), strconv.Itoa(int(header.Port)))
 
 			for _, sub := range subs {
-				l.Debug("back sourcer submit", slog.Any("HopIP", header.HopIP), slog.Any("UserID", sub.UserID), slog.String("ReqData", string(sub.Data)))
+				l.Debug("back sourcer submit", slog.Any("UserID", sub.UserID), slog.String("ReqData", string(sub.Data)))
 				backsourcer.BackSourcerMap[protocal].Submit(
 					&backsourcer.BackSourceTask{
 						HopIP:      header.HopIP,
@@ -88,10 +88,12 @@ func HandleQUICPacket(remoteAddr string, pkt []byte, l *slog.Logger) {
 			var subs []packet.SubPacket
 			_, subs, err = packet.Parse(pkt, len(pkt))
 			if err != nil || len(subs) == 0 {
+				l.Error("Parse failed", slog.String("remoteAddr", remoteAddr), slog.Any("err", err))
 				return
 			}
 
 			for _, sub := range subs {
+				l.Debug("back client submit", slog.Any("UserID", sub.UserID), slog.String("ReqData", string(sub.Data)))
 				disaggregator.GlobalDisagg.Deliver(sub.UserID, sub.Data)
 			}
 		} else {
