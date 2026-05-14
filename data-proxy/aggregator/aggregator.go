@@ -177,7 +177,7 @@ func (a *Aggregator) AddToBatch(
 }
 
 type sendInfo struct {
-	p          *packet.Packet
+	p          []byte
 	routingKey string
 	next       net.IP
 }
@@ -203,7 +203,9 @@ func (w *worker) handleMsg(msg *aggregatorMsg, logger *slog.Logger) {
 		pkt.SetProtocol(msg.protocol)
 		pkt.SetHopPos(1)
 		pkt.AppendUserPacket(msg.userID, msg.data, logger)
-		w.flush(pkt, msg.routingKey, msg.nextHop, logger)
+		pkt.SerializeHead()
+		buf := pkt.Buf[:pkt.TotalBytes()]
+		w.flush(buf, msg.routingKey, msg.nextHop, logger)
 		return
 	}
 
@@ -324,7 +326,6 @@ func (w *worker) checkTimeout(logger *slog.Logger) {
 			break
 		}
 		popItem := heap.Pop(&w.heap).(*HeapItem)
-		//popItem.batch.heapItem = nil
 		expired = append(expired, popItem)
 	}
 	w.mu.Unlock()
@@ -333,7 +334,12 @@ func (w *worker) checkTimeout(logger *slog.Logger) {
 	for _, item := range expired {
 		b := item.batch
 		b.mu.Lock()
-		toSend = append(toSend, sendInfo{b.pkt, b.RoutingKey, b.NextHop})
+		b.pkt.SerializeHead()
+		buf := make([]byte, b.pkt.TotalBytes())
+		copy(buf, b.pkt.Buf[:b.pkt.TotalBytes()])
+
+		toSend = append(toSend, sendInfo{buf, b.RoutingKey, b.NextHop})
+
 		b.pkt.Wp = packet.HeaderSize
 		b.createTime = now
 		b.heapItem = nil
@@ -345,25 +351,20 @@ func (w *worker) checkTimeout(logger *slog.Logger) {
 	}
 }
 
-func (w *worker) flush(p *packet.Packet, routingKey string, nextHop net.IP, logger *slog.Logger) {
+func (w *worker) flush(buf []byte, routingKey string, nextHop net.IP, logger *slog.Logger) {
 
-	logger.Info("flush batch", slog.Int("workId", w.id), slog.Any("port", p.Port))
-
-	if p.PayloadLen == 0 {
-		logger.Warn("empty batch", slog.Int("workId", w.id), slog.Any("port", p.Port))
+	logger.Info("flush batch", slog.Int("workId", w.id), slog.Any("nextHop", nextHop))
+	if len(buf) <= 0 {
+		logger.Warn("empty batch", slog.Int("workId", w.id), slog.Any("nextHop", nextHop))
 		return
 	}
-	p.SerializeHead()
-	buf := p.Buf[:p.TotalBytes()]
 
 	go func() {
-		logger.Info("send packet", slog.Int("workId", w.id), slog.String("routingKey", routingKey),
-			slog.Any("port", p.Port), slog.Any("buf", len(buf)))
-		logger.Debug("send packet", slog.Int("workId", w.id), slog.String("routingKey", routingKey),
-			slog.Any("port", p.Port), slog.String("buf", string(buf)))
+		logger.Info("send packet", slog.Int("workId", w.id), slog.String("routingKey", routingKey), slog.Any("buf", len(buf)))
+		logger.Debug("send packet content", slog.Int("workId", w.id), slog.String("routingKey", routingKey), slog.String("buf", string(buf)))
 		err := manager.TunnelMgr.SendPacket(context.Background(), nextHop, buf, nextHop.String(), logger)
 		if err != nil {
-			logger.Error("send packet failed", slog.Int("workId", w.id), slog.Any("port", p.Port), slog.Any("nextHop", nextHop))
+			logger.Error("send packet failed", slog.Int("workId", w.id), slog.Any("nextHop", nextHop))
 		}
 	}()
 }
