@@ -17,6 +17,7 @@ const (
 	inputChanSize         = 100000
 	aggregatorWorkerCount = 8 //todo temporarily change for testing
 	batchMaxAge           = 60 * time.Second
+	sendConcurrentLimit   = 500
 )
 
 type aggregatorMsg struct {
@@ -79,6 +80,7 @@ type worker struct {
 	mu      sync.RWMutex
 	id      int
 	stopCh  chan struct{}
+	sendSem chan struct{}
 }
 
 type Aggregator struct {
@@ -110,6 +112,7 @@ func NewAggregator(pre string, l *slog.Logger) *Aggregator {
 			heap:    make(MinHeap, 0),
 			id:      i,
 			stopCh:  make(chan struct{}),
+			sendSem: make(chan struct{}, sendConcurrentLimit),
 		}
 	}
 	return agg
@@ -359,7 +362,9 @@ func (w *worker) flush(buf []byte, routingKey string, nextHop net.IP, logger *sl
 		return
 	}
 
+	w.sendSem <- struct{}{}
 	go func() {
+		defer func() { <-w.sendSem }()
 		logger.Info("send packet", slog.Int("workId", w.id), slog.String("routingKey", routingKey), slog.Any("buf", len(buf)))
 		logger.Debug("send packet content", slog.Int("workId", w.id), slog.String("routingKey", routingKey), slog.String("buf", string(buf)))
 		err := manager.TunnelMgr.SendPacket(context.Background(), nextHop, buf, nextHop.String(), logger)
