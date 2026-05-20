@@ -104,6 +104,7 @@ func main() {
 	disaggregator.GlobalDisagg = disaggregator.NewDisaggregator(pre, logger)
 
 	server.InitRateLimiter(config.Config_.RateLimit)
+	server.InitWorkerPool()
 
 	manager.TunnelMgr = manager.NewTunnelManager(pre, logger)
 

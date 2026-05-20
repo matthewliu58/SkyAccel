@@ -17,7 +17,7 @@ const (
 	inputChanSize         = 100000
 	aggregatorWorkerCount = 4 //todo temporarily change for testing
 	batchMaxAge           = 60 * time.Second
-	sendConcurrentLimit   = 25
+	sendConcurrentLimit   = 8
 )
 
 type aggregatorMsg struct {

@@ -25,9 +25,24 @@ var (
 	accessWindow         = 5 * time.Second
 	defaultKeepAliveTime = 30 * time.Second
 
-	tcpConcurrentLimit = 500
-	tcpSem             = make(chan struct{}, tcpConcurrentLimit)
+	// Worker pool configuration for short connections
+	workerCount     = 32    // Fixed worker count, adjust based on CPU cores
+	maxPendingConns = 10000 // Max pending connections in queue
+	connChan        = make(chan *connTask, maxPendingConns)
+
+	// Long connection concurrency limit
+	longConnLimit = 500 // Max long connections allowed
+	longConnSem   = make(chan struct{}, longConnLimit)
 )
+
+type connTask struct {
+	conn      net.Conn
+	port      int
+	access    *slog.Logger
+	logger    *slog.Logger
+	server    *TCPServer
+	keepAlive bool
+}
 
 func shouldLogAccess(clientIP string) bool {
 	now := time.Now()
@@ -45,6 +60,20 @@ func shouldLogAccess(clientIP string) bool {
 	}
 
 	return false
+}
+
+func InitWorkerPool() {
+	for i := 0; i < workerCount; i++ {
+		go func() {
+			for task := range connChan {
+				if task.keepAlive {
+					handleConnectionKeepAlive(task.conn, task.port, task.access, task.logger, task.server)
+				} else {
+					handleConnection(task.conn, task.port, task.access, task.logger)
+				}
+			}
+		}()
+	}
 }
 
 func NewTCPServer(keepAlive bool, keepAliveTime time.Duration) *TCPServer {
@@ -89,19 +118,41 @@ func (t *TCPServer) StartServerRun(port int, access *slog.Logger, req string, l 
 			l.Error("accept failed", slog.String("req", req), slog.Any("err", err))
 			continue
 		}
+
+		// ====================== Key modification ======================
 		if t.keepAlive {
-			tcpSem <- struct{}{}
-			go func(c net.Conn) {
-				defer func() { <-tcpSem }()
-				handleConnectionKeepAlive(c, port, access, l, t)
-			}(conn)
+			// Long connection: dedicated goroutine, not in worker pool, but limited
+			select {
+			case longConnSem <- struct{}{}:
+				go func(c net.Conn) {
+					defer func() {
+						<-longConnSem
+						_ = c.Close()
+					}()
+					handleConnectionKeepAlive(c, port, access, l, t)
+				}(conn)
+			default:
+				l.Warn("long connection limit reached", slog.String("client", conn.RemoteAddr().String()))
+				_ = conn.Close()
+			}
 		} else {
-			tcpSem <- struct{}{}
-			go func(c net.Conn) {
-				defer func() { <-tcpSem }()
-				handleConnection(c, port, access, l)
-			}(conn)
+			// Short connection: goes to worker pool, high performance
+			select {
+			case connChan <- &connTask{
+				conn:      conn,
+				port:      port,
+				access:    access,
+				logger:    l,
+				server:    t,
+				keepAlive: false,
+			}:
+				// Task submitted
+			default:
+				l.Warn("queue full, close conn", slog.String("client", conn.RemoteAddr().String()))
+				_ = conn.Close()
+			}
 		}
+		// ======================================================
 	}
 }
 
@@ -175,6 +226,8 @@ func handleConnection(conn net.Conn, port int, a, l *slog.Logger) {
 		l.Error("read content failed", slog.Any("reqId", reqID),
 			slog.String("clientIp", clientIP), slog.Any("err", err))
 		return
+	} else {
+		l.Debug("client sent request", slog.Any("reqId", reqID), slog.String("data", string(data)))
 	}
 
 	go func() {
@@ -256,10 +309,16 @@ func handleConnection(conn net.Conn, port int, a, l *slog.Logger) {
 	case respData, ok := <-waitCh:
 		if !ok {
 			l.Error("wait chan closed", slog.Any("reqId", reqID))
-			return
+			//return
 		}
-		_, _ = conn.Write(respData)
-		l.Info("aggregated proxy response sent", slog.Any("reqId", reqID))
+		_ = conn.SetWriteDeadline(time.Now().Add(proxyTimeout))
+		if _, err := conn.Write(respData); err != nil {
+			l.Error("write response failed", slog.Any("reqId", reqID), slog.Any("err", err))
+			//return
+		} else {
+			l.Debug("client receive response", slog.Any("reqId", reqID), slog.String("respData", string(respData)))
+			l.Info("aggregated proxy response sent", slog.Any("reqId", reqID))
+		}
 
 	case <-time.After(proxyTimeout):
 		l.Error("wait response timeout", slog.Any("reqId", reqID))
@@ -391,12 +450,16 @@ func handleConnectionKeepAlive(conn net.Conn, port int, a, l *slog.Logger, serve
 				cleanup()
 				if !ok {
 					l.Error("wait chan closed", slog.Any("reqId", reqID))
-					return
+					//return
 				}
 				_ = conn.SetWriteDeadline(time.Now().Add(proxyTimeout))
-				l.Debug("client receive response", slog.Any("reqId", reqID), slog.String("respData", string(respData)))
-				_, _ = conn.Write(respData)
-				l.Info("aggregated proxy response sent", slog.Any("reqId", reqID))
+				if _, err := conn.Write(respData); err != nil {
+					l.Error("write response failed", slog.Any("reqId", reqID), slog.Any("err", err))
+					//return
+				} else {
+					l.Debug("client receive response", slog.Any("reqId", reqID), slog.String("respData", string(respData)))
+					l.Info("aggregated proxy response sent", slog.Any("reqId", reqID))
+				}
 
 			case <-time.After(proxyTimeout):
 				cleanup()
