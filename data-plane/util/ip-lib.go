@@ -55,7 +55,7 @@ func GetIPInfo(ip string, pre string, logger *slog.Logger) (IPInfoResult, error)
 
 	return IPInfoResult{
 		IP:      ip,
-		Country: res.Country_long,
+		Country: res.Country_short,
 		//CountryCode: res.Country_short,
 		Continent: GetContinentByCountry(res.Country_long),
 		Province:  res.Region,
