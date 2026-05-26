@@ -30,13 +30,14 @@ func collectCPU() (model.CPUInfo, error) {
 		return model.CPUInfo{}, err
 	}
 
-	percent, err := cpu.Percent(1*time.Second, false)
+	percent, err := cpu.Percent(1*time.Second, true)
 	if err != nil {
 		return model.CPUInfo{}, err
 	}
-	usage := 0.0
-	if len(percent) > 0 {
-		usage = percent[0]
+
+	totalUsage := 0.0
+	for _, p := range percent {
+		totalUsage += p
 	}
 
 	var load1Min = 0.0
@@ -52,13 +53,13 @@ func collectCPU() (model.CPUInfo, error) {
 	info := model.CPUInfo{
 		PhysicalCore: physicalCounts,
 		LogicalCore:  cpuCounts,
-		Usage:        usage,
+		Usage:        totalUsage,
 		Load1Min:     load1Min,
 	}
 
 	elapsed := now.Sub(lastCPUTime)
 	if !(lastCPUTime.IsZero() || elapsed > cpuWindow) {
-		info.LoadDelta = usage - lastCPU.Usage
+		info.LoadDelta = totalUsage - lastCPU.Usage
 	}
 
 	lastCPU = info
