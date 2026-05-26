@@ -5,7 +5,6 @@ import (
 	"control-plane/util"
 	"log/slog"
 	"sync"
-	"time"
 )
 
 type GlobalStats struct {
@@ -62,14 +61,11 @@ func (g *GlobalStats) GetAggValue(key string) *rece.LastCongestion {
 	return &copy_
 }
 
-func (g *GlobalStats) StartAggregateWorker(logger *slog.Logger) {
-	ticker := time.NewTicker(5 * time.Second)
-	go func() {
-		for range ticker.C {
-			pre := util.GenerateRandomLetters(5)
-			g.rebuildAggregate(pre, logger)
-		}
-	}()
+// RebuildAggregate triggers a single-pass rebuild of edge aggregate stats.
+// Call this on every last-mile report instead of using the timer-based worker.
+func (g *GlobalStats) RebuildAggregate(logger *slog.Logger) {
+	pre := util.GenerateRandomLetters(5)
+	g.rebuildAggregate(pre, logger)
 }
 
 func (g *GlobalStats) rebuildAggregate(pre string, logger *slog.Logger) {

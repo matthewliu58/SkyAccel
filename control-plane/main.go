@@ -151,7 +151,11 @@ func HandleLastWatchEvent(
 			slog.String("eventType", eventType),
 			slog.String("key", key),
 		)
+		return
 	}
+
+	// Event-driven: rebuild edge aggregates on every last-mile report
+	go globalStats.RebuildAggregate(logger)
 }
 
 func main() {
@@ -260,27 +264,19 @@ func main() {
 		}
 	}
 
-	globalStats.StartAggregateWorker(logger)
+	// Initial rebuild after loading all existing nodes
+	globalStats.RebuildAggregate(logger)
+
 	_client.WatchPrefix(cli, "/routing-last/",
 		func(eventType, key, val string, logger *slog.Logger) {
 			HandleLastWatchEvent(globalStats, eventType, key, val, logger)
 		}, logger)
 
-	exe, _ := os.Executable()
-	storageDir := filepath.Join(filepath.Dir(exe), "vm_storage")
-	logger.Info(
-		"using storage directory",
-		slog.String("pre", pre),
-		slog.String("storageDir", storageDir),
-	)
-	s, _ := util.NewFileStorage(storageDir, 0, pre, logger)
-	go agg.CalcClusterWeightedAvg(s, 5*time.Second, cli, pre, logger)
-
 	router := gin.Default()
 	router.GET("/health", func(c *gin.Context) { c.JSON(http.StatusOK, "success") })
 
 	api.InitNodeProbeRouter(router, cli, logger)
-	api.InitVmReceiveAPIRouter(router, s, logger)
+	api.InitVmReceiveAPIRouter(router, cli, logger)
 	api.InitLastReceiveAPIRouter(router, cli, logger)
 	api.InitUserRoutingRouter(router, r, globalStats, logger)
 

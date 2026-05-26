@@ -1,6 +1,7 @@
 package api
 
 import (
+	agg "control-plane/aggregator"
 	model "control-plane/receive-info"
 	"control-plane/util"
 	"encoding/json"
@@ -11,16 +12,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type VmReceiveAPIHandler struct {
-	storage    util.Storage
+	etcdClient *clientv3.Client
 	logger     *slog.Logger
-	activityVM *util.SafeMap
 }
 
-func NewVmReceiveAPIHandler(s util.Storage, l *slog.Logger) *VmReceiveAPIHandler {
-	return &VmReceiveAPIHandler{storage: s, logger: l, activityVM: util.NewSafeMap()}
+func NewVmReceiveAPIHandler(cli *clientv3.Client, l *slog.Logger) *VmReceiveAPIHandler {
+	return &VmReceiveAPIHandler{etcdClient: cli, logger: l}
 }
 
 func (h *VmReceiveAPIHandler) PostVMReceive(c *gin.Context) {
@@ -96,13 +97,8 @@ func (h *VmReceiveAPIHandler) PostVMReceive(c *gin.Context) {
 		reportData.Network.PortCount = 0
 	}
 
-	if _, err := h.storage.Save(&reportData, pre); err != nil {
-		resp.Code = 500
-		resp.Msg = "Data save failed: " + err.Error()
-		c.JSON(http.StatusOK, resp)
-		h.logger.Error(resp.Msg)
-		return
-	}
+	// Event-driven: directly compute and push to etcd, no file storage
+	go agg.DoClusterWeightedAvg(&reportData, h.etcdClient, pre, h.logger)
 
 	resp.Code = 200
 	resp.Msg = "VM information reported successfully"
@@ -114,14 +110,14 @@ func (h *VmReceiveAPIHandler) PostVMReceive(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func InitVmReceiveAPIRouter(router *gin.Engine, s *util.FileStorage, logger *slog.Logger) *gin.Engine {
+func InitVmReceiveAPIRouter(router *gin.Engine, cli *clientv3.Client, logger *slog.Logger) *gin.Engine {
 
 	r := router
 	apiV1 := r.Group("/api/v1")
 	{
 		vmGroup := apiV1.Group("/vm")
 		{
-			handler := NewVmReceiveAPIHandler(s, logger)
+			handler := NewVmReceiveAPIHandler(cli, logger)
 			vmGroup.POST("/receive", handler.PostVMReceive)
 		}
 	}
