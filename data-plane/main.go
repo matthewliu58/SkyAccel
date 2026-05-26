@@ -74,6 +74,7 @@ func main() {
 
 	go last.LastTelemetryReporter(pre, logger)
 
+	middle.StartCPUSampler()
 	go middle.VMTelemetryReporter(pre, logger)
 
 	probing.StartProbePeriodically(context.Background(), util.Config_.ControlHost,

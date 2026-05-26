@@ -2,6 +2,7 @@ package collector
 
 import (
 	model "data-plane/report-info"
+	"math"
 	"sync"
 	"time"
 
@@ -10,60 +11,114 @@ import (
 )
 
 const (
-	cpuWindow = 60 * time.Second
+	sampleInterval = 1 * time.Second
 )
 
 var (
-	lastCPU     model.CPUInfo
-	lastCPUTime time.Time
-	cpuMu       sync.Mutex
+	physicalCores int
+	logicalCores  int
+
+	peakMu    sync.Mutex
+	peakUsage float64
+	maxDelta  float64
+	prevUsage float64
+	load1Min  float64
+
+	startOnce sync.Once
+	stopCh    chan struct{}
 )
 
-func collectCPU() (model.CPUInfo, error) {
+// StartCPUSampler starts background CPU sampling (once).
+func StartCPUSampler() {
+	startOnce.Do(func() {
+		stopCh = make(chan struct{})
+		go runSampler()
+	})
+}
 
-	cpuCounts, err := cpu.Counts(true)
-	if err != nil {
-		return model.CPUInfo{}, err
+// StopCPUSampler stops the background CPU sampler.
+func StopCPUSampler() {
+	if stopCh != nil {
+		close(stopCh)
 	}
-	physicalCounts, err := cpu.Counts(false)
-	if err != nil {
-		return model.CPUInfo{}, err
-	}
+}
 
-	percent, err := cpu.Percent(1*time.Second, true)
-	if err != nil {
-		return model.CPUInfo{}, err
-	}
+func runSampler() {
+	// cache core counts (static)
+	physical, _ := cpu.Counts(false)
+	logical, _ := cpu.Counts(true)
+	physicalCores = physical
+	logicalCores = logical
 
-	totalUsage := 0.0
+	ticker := time.NewTicker(sampleInterval)
+	defer ticker.Stop()
+
+	// seed initial prevUsage
+	percent, _ := cpu.Percent(0, true)
+	var initTotal float64
 	for _, p := range percent {
-		totalUsage += p
+		initTotal += p
+	}
+	prevUsage = initTotal
+
+	for {
+		select {
+		case <-stopCh:
+			return
+		case <-ticker.C:
+			sample()
+		}
+	}
+}
+
+func sample() {
+	// true = per-core, sum them up to match "top" output
+	percent, err := cpu.Percent(0, true)
+	if err != nil || len(percent) == 0 {
+		return
 	}
 
-	var load1Min = 0.0
-	loadStat, err := load.Avg()
-	if err == nil {
-		load1Min = loadStat.Load1
+	total := 0.0
+	for _, p := range percent {
+		total += p
 	}
 
-	cpuMu.Lock()
-	defer cpuMu.Unlock()
+	// update system load
+	if l, err := load.Avg(); err == nil {
+		load1Min = l.Load1
+	}
 
-	now := time.Now()
-	info := model.CPUInfo{
-		PhysicalCore: physicalCounts,
-		LogicalCore:  cpuCounts,
-		Usage:        totalUsage,
+	// track peak and delta
+	peakMu.Lock()
+	if total > peakUsage {
+		peakUsage = total
+	}
+
+	// compute step delta
+	d := math.Abs(total - prevUsage)
+	if d > maxDelta {
+		maxDelta = d
+	}
+	prevUsage = total
+	peakMu.Unlock()
+}
+
+// collectCPU non-blocking; returns the current window's peak values.
+func collectCPU() (model.CPUInfo, error) {
+	peakMu.Lock()
+	usage := peakUsage
+	delta := maxDelta
+
+	// reset window
+	peakUsage = 0
+	maxDelta = 0
+	peakMu.Unlock()
+
+	return model.CPUInfo{
+		PhysicalCore: physicalCores,
+		LogicalCore:  logicalCores,
+		Usage:        usage,
 		Load1Min:     load1Min,
-	}
-
-	elapsed := now.Sub(lastCPUTime)
-	if !(lastCPUTime.IsZero() || elapsed > cpuWindow) {
-		info.LoadDelta = totalUsage - lastCPU.Usage
-	}
-
-	lastCPU = info
-	lastCPUTime = now
-
-	return info, nil
+		LoadDelta:    delta,
+	}, nil
 }
