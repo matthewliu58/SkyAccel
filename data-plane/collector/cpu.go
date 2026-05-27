@@ -168,6 +168,10 @@ func collectCPU() (model.CPUInfo, error) {
 	firstSample = true
 	peakMu.Unlock()
 
+	if usage <= 1 {
+		usage = 1
+	}
+
 	return model.CPUInfo{
 		PhysicalCore: physicalCores,
 		LogicalCore:  logicalCores,

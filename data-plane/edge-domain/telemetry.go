@@ -190,6 +190,9 @@ func calculateLastCongestion(pre string, logger *slog.Logger) map[string]*LastCo
 	for k, s := range agg {
 
 		s.AvgRT = s.SumRT / float64(s.Count)
+		if s.AvgRT <= 0 {
+			s.AvgRT = 1
+		}
 
 		rtList := rts[k]
 		if len(rtList) == 0 {
@@ -201,6 +204,9 @@ func calculateLastCongestion(pre string, logger *slog.Logger) map[string]*LastCo
 			p95Idx = len(rtList) - 1
 		}
 		s.P95RT = rtList[p95Idx]
+		if s.P95RT <= 0 {
+			s.P95RT = 1
+		}
 	}
 
 	logger.Info("calculateLastCongestion completed", slog.String("pre", pre), slog.Int("valid_records", len(valid)))

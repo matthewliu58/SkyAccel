@@ -1,6 +1,7 @@
 package util
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/ip2location/ip2location-go/v9"
 	"log/slog"
@@ -8,9 +9,47 @@ import (
 	"path/filepath"
 )
 
+type ipOverride struct {
+	Country   string `json:"country"`
+	Continent string `json:"continent"`
+	Province  string `json:"province"`
+	City      string `json:"city"`
+}
+
 var (
-	ipDb *ip2location.DB
+	ipDb        *ip2location.DB
+	ipOverrides map[string]ipOverride
 )
+
+func ipOverrideConfigPath() string {
+	exePath, _ := os.Executable()
+	return filepath.Join(filepath.Dir(exePath), "ip-override.json")
+}
+
+func loadIPOverrides(pre string, logger *slog.Logger) {
+	path := ipOverrideConfigPath()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			logger.Info("no ip-override.json found, skipping", slog.String("pre", pre))
+			return
+		}
+		logger.Error("failed to read ip-override.json", slog.String("pre", pre), slog.String("err", err.Error()))
+		return
+	}
+
+	var raw map[string]ipOverride
+	if err := json.Unmarshal(data, &raw); err != nil {
+		logger.Error("failed to parse ip-override.json", slog.String("pre", pre), slog.String("err", err.Error()))
+		return
+	}
+
+	ipOverrides = make(map[string]ipOverride, len(raw))
+	for ip, ov := range raw {
+		ipOverrides[ip] = ov
+	}
+	logger.Info("loaded ip overrides", slog.String("pre", pre), slog.Int("count", len(ipOverrides)))
+}
 
 func InitIPInfo(pre string, logger *slog.Logger) error {
 
@@ -26,6 +65,8 @@ func InitIPInfo(pre string, logger *slog.Logger) error {
 	} else {
 		logger.Info("InitIPInfo", slog.String("pre", pre), slog.String("dbPath", dbPath))
 	}
+
+	loadIPOverrides(pre, logger)
 
 	return nil
 }
@@ -53,13 +94,30 @@ func GetIPInfo(ip string, pre string, logger *slog.Logger) (IPInfoResult, error)
 		return IPInfoResult{}, err
 	}
 
-	return IPInfoResult{
-		IP:      ip,
-		Country: res.Country_short,
-		//CountryCode: res.Country_short,
+	result := IPInfoResult{
+		IP:        ip,
+		Country:   res.Country_short,
 		Continent: GetContinentByCountry(res.Country_short),
 		Province:  res.Region,
 		City:      res.City,
-		//ISP:       res.Isp,
-	}, nil
+	}
+
+	// apply ip-override.json overrides
+	if ov, ok := ipOverrides[ip]; ok {
+		if ov.Country != "" {
+			result.Country = ov.Country
+		}
+		if ov.Continent != "" {
+			result.Continent = ov.Continent
+		}
+		if ov.Province != "" {
+			result.Province = ov.Province
+		}
+		if ov.City != "" {
+			result.City = ov.City
+		}
+		logger.Info("ip override applied", slog.String("pre", pre), slog.String("ip", ip))
+	}
+
+	return result, nil
 }
