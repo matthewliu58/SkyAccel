@@ -206,24 +206,25 @@ func computeCPUPenalty(nodeIP string, Qk float64, logicalCores int) float64 {
 	// Get dynamic CPU thresholds based on core count
 	config := GetCPUThresholds(logicalCores)
 
-	penaltyMu.RLock()
-	inPenalty := penaltyMap[nodeIP]
-	penaltyMu.RUnlock()
+	// TODO: Temporarily disable hysteresis penalty for observation
+	// penaltyMu.RLock()
+	// inPenalty := penaltyMap[nodeIP]
+	// penaltyMu.RUnlock()
 
-	if Qk >= config.HysteresisUp {
-		penaltyMu.Lock()
-		penaltyMap[nodeIP] = true
-		penaltyMu.Unlock()
-	} else if inPenalty && Qk > config.HysteresisDn {
-	} else if inPenalty && Qk <= config.HysteresisDn {
-		penaltyMu.Lock()
-		penaltyMap[nodeIP] = false
-		penaltyMu.Unlock()
-	}
+	// if Qk >= config.HysteresisUp {
+	// 	penaltyMu.Lock()
+	// 	penaltyMap[nodeIP] = true
+	// 	penaltyMu.Unlock()
+	// } else if inPenalty && Qk > config.HysteresisDn {
+	// } else if inPenalty && Qk <= config.HysteresisDn {
+	// 	penaltyMu.Lock()
+	// 	penaltyMap[nodeIP] = false
+	// 	penaltyMu.Unlock()
+	// }
 
-	if inPenalty && Qk < config.HysteresisUp {
-		Qk = config.HysteresisUp
-	}
+	// if inPenalty && Qk < config.HysteresisUp {
+	// 	Qk = config.HysteresisUp
+	// }
 
 	if Qk <= config.Low {
 		return 0.5
