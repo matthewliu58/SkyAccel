@@ -6,7 +6,7 @@ import requests
 import json
 from datetime import datetime
 
-CONTROL_PLANE_URL = "http://localhost:7081/api/v1/routing/last"
+CONTROL_PLANE_URL = "http://localhost:7081/api/v1/routing/last?ip=1.1.1.1"
 SERVER_PORT = 8081
 CONCURRENCY = 400
 TOTAL_RUN_SECONDS = 100

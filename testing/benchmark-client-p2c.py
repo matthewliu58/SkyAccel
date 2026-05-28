@@ -6,7 +6,7 @@ import requests
 import json
 from datetime import datetime
 
-CONTROL_PLANE_URL = "http://localhost:7081/api/v1/routing/last"
+CONTROL_PLANE_URL = "http://localhost:7081/api/v1/routing/last?ip=1.1.1.1&algorithm=p2c"
 SERVER_PORT = 8081
 CONCURRENCY = 400
 TOTAL_RUN_SECONDS = 100
@@ -34,15 +34,7 @@ def fetch_routing_table():
     """Fetch routing table from control-plane every second"""
     while not stop_event.is_set():
         try:
-            payload = {
-                "source": {
-                    "ip": "157.230.41.239",
-                    "continent": "Asia",
-                    "country": "HongKong",
-                    "city": "HongKong"
-                }
-            }
-            resp = requests.post(CONTROL_PLANE_URL, json=payload, timeout=5)
+            resp = requests.post(CONTROL_PLANE_URL, json={}, timeout=5)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("code") == 200 and "data" in data:
