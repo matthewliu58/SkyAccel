@@ -44,7 +44,7 @@ func NewEWMARouter(
 		latEWMA:  make(map[string]float64),
 		cpuAlpha: 0.3, // Smoothing factor for CPU
 		latAlpha: 0.3, // Smoothing factor for latency
-		lambda:   0.7, // Weight for CPU (higher means more CPU-aware)
+		lambda:   0.5, // Weight for CPU (1:1 ratio with latency)
 	}
 }
 
@@ -140,10 +140,13 @@ func (r *EWMARouter) Computing(endPoints routing.EndPoints, pre string, logger *
 	logger.Info("EWMA collected nodes", slog.String("pre", pre), slog.Int("nodeCount", len(nodeIps)))
 
 	type nodeScore struct {
-		nodeIp   string
-		cpuEwma  float64
-		latEwma  float64
-		combined float64
+		nodeIp      string
+		cpuUsage    float64
+		latency     float64
+		cpuEwma     float64
+		latEwma     float64
+		normLatEwma float64
+		combined    float64
 	}
 
 	var candidates []nodeScore
@@ -179,29 +182,26 @@ func (r *EWMARouter) Computing(endPoints routing.EndPoints, pre string, logger *
 		r.updateEWMALatency(nodeIp, latency)
 		latEwma := r.getLatEWMA(nodeIp)
 
-		// Calculate combined score: λ * CPU_EWMA + (1-λ) * Latency_EWMA
-		// Normalize latency to 0-100 scale (assuming latency in ms, divide by some factor)
-		normLatEwma := latEwma / 10 // Convert ms to approximate 0-100 scale
+		// Normalize latency to 0-100 scale: latency_ms / 2 (e.g., 100ms -> 50, 20ms -> 10)
+		// This makes 100ms latency equivalent to 50% CPU load (1:1 ratio)
+		normLatEwma := latEwma / 2.0
 		if normLatEwma > 100 {
 			normLatEwma = 100
 		}
 
+		// Calculate combined score: λ * CPU_EWMA + (1-λ) * Latency_EWMA
+		// With λ=0.5, CPU and latency have equal 1:1 weight
 		combined := r.lambda*cpuEwma + (1-r.lambda)*normLatEwma
 
 		candidates = append(candidates, nodeScore{
-			nodeIp:   nodeIp,
-			cpuEwma:  cpuEwma,
-			latEwma:  latEwma,
-			combined: combined,
+			nodeIp:      nodeIp,
+			cpuUsage:    cpuUsage,
+			latency:     latency,
+			cpuEwma:     cpuEwma,
+			latEwma:     latEwma,
+			normLatEwma: normLatEwma,
+			combined:    combined,
 		})
-
-		logger.Debug("EWMA node score",
-			slog.String("pre", pre),
-			slog.String("nodeIp", nodeIp),
-			slog.Float64("cpuEwma", cpuEwma),
-			slog.Float64("latEwma", latEwma),
-			slog.Float64("normLatEwma", normLatEwma),
-			slog.Float64("combinedScore", combined))
 	}
 
 	if len(candidates) == 0 {
@@ -218,13 +218,38 @@ func (r *EWMARouter) Computing(endPoints routing.EndPoints, pre string, logger *
 		}
 	}
 
-	// Convert to PathInfo
+	// Normalize: 1/combined as weight, then normalize to probabilities
+	// Lower combined score → higher weight → higher traffic share
+	totalWeight := 0.0
+	rawWeights := make([]float64, len(candidates))
+	for i, c := range candidates {
+		if c.combined > 0 {
+			rawWeights[i] = 1.0 / c.combined
+		} else {
+			rawWeights[i] = 1.0
+		}
+		totalWeight += rawWeights[i]
+	}
+
+	// Convert to PathInfo with normalized probabilities
 	var paths []routing.PathInfo
-	for _, c := range candidates {
+	for i, c := range candidates {
+		prob := rawWeights[i] / totalWeight
 		paths = append(paths, routing.PathInfo{
-			Hops: []string{c.nodeIp},
-			Rtt:  c.combined,
+			Hops:   []string{c.nodeIp},
+			Rtt:    prob,
+			RawRTT: c.combined,
 		})
+		logger.Debug("EWMA node prob",
+			slog.String("pre", pre),
+			slog.String("nodeIp", c.nodeIp),
+			slog.Float64("cpuUsage", c.cpuUsage),
+			slog.Float64("cpuEwma", c.cpuEwma),
+			slog.Float64("latency", c.latency),
+			slog.Float64("latEwma", c.latEwma),
+			slog.Float64("normLatEwma", c.normLatEwma),
+			slog.Float64("combinedScore", c.combined),
+			slog.Float64("prob", prob))
 	}
 
 	logger.Info("EWMA routing completed",

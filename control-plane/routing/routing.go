@@ -109,8 +109,8 @@ func InitLastInterface(g *graph.GraphManager, a *agg.GlobalStats, algorithm stri
 		}
 		return RoutingLastInterface{Operate: router}
 	case P2C:
-		// Power-of-Two Choices: randomly pick two nodes, select the lighter one
-		router := last.NewP2CRouter(nodes)
+		// Power-of-Two Choices: proportional distribution based on inverse CPU load
+		router := last.NewP2CRouter(nodes, edgeAgg)
 		return RoutingLastInterface{Operate: router}
 	case EWMABased:
 		// EWMA-based: use exponentially weighted moving average for smoothed control

@@ -60,7 +60,7 @@ func TestP2CRouter_BasicFunctionality(t *testing.T) {
 		},
 	}
 
-	router := NewP2CRouter(nodeTel)
+	router := NewP2CRouter(nodeTel, nil)
 	endPoints := routing.EndPoints{
 		Source: routing.EndPoint{Continent: "Asia", City: "Shanghai"},
 	}
@@ -114,7 +114,7 @@ func TestP2CRouter_SingleNode(t *testing.T) {
 		},
 	}
 
-	router := NewP2CRouter(nodeTel)
+	router := NewP2CRouter(nodeTel, nil)
 	endPoints := routing.EndPoints{
 		Source: routing.EndPoint{Continent: "Asia", City: "Shanghai"},
 	}
@@ -152,7 +152,7 @@ func TestP2CRouter_NoMatchingContinent(t *testing.T) {
 		},
 	}
 
-	router := NewP2CRouter(nodeTel)
+	router := NewP2CRouter(nodeTel, nil)
 	// Request from Europe, but only Asia nodes available
 	endPoints := routing.EndPoints{
 		Source: routing.EndPoint{Continent: "Europe", City: "London"},
@@ -202,7 +202,7 @@ func TestP2CRouter_NegativeCPUHandling(t *testing.T) {
 		},
 	}
 
-	router := NewP2CRouter(nodeTel)
+	router := NewP2CRouter(nodeTel, nil)
 	endPoints := routing.EndPoints{
 		Source: routing.EndPoint{Continent: "Asia", City: "Shanghai"},
 	}
@@ -247,7 +247,7 @@ func TestP2CRouter_PathSorting(t *testing.T) {
 		},
 	}
 
-	router := NewP2CRouter(nodeTel)
+	router := NewP2CRouter(nodeTel, nil)
 	endPoints := routing.EndPoints{
 		Source: routing.EndPoint{Continent: "Asia", City: "Shanghai"},
 	}
