@@ -151,6 +151,7 @@ func (r *EWMARouter) Computing(endPoints routing.EndPoints, pre string, logger *
 
 	var candidates []nodeScore
 
+	// First pass: collect raw values
 	for _, nodeIp := range nodeIps {
 		tel, telOk := r.nodeTel[nodeIp]
 		if !telOk {
@@ -182,31 +183,56 @@ func (r *EWMARouter) Computing(endPoints routing.EndPoints, pre string, logger *
 		r.updateEWMALatency(nodeIp, latency)
 		latEwma := r.getLatEWMA(nodeIp)
 
-		// Normalize latency to 0-100 scale: latency_ms / 2 (e.g., 100ms -> 50, 20ms -> 10)
-		// This makes 100ms latency equivalent to 50% CPU load (1:1 ratio)
-		normLatEwma := latEwma / 2.0
-		if normLatEwma > 100 {
-			normLatEwma = 100
-		}
-
-		// Calculate combined score: λ * CPU_EWMA + (1-λ) * Latency_EWMA
-		// With λ=0.5, CPU and latency have equal 1:1 weight
-		combined := r.lambda*cpuEwma + (1-r.lambda)*normLatEwma
-
 		candidates = append(candidates, nodeScore{
-			nodeIp:      nodeIp,
-			cpuUsage:    cpuUsage,
-			latency:     latency,
-			cpuEwma:     cpuEwma,
-			latEwma:     latEwma,
-			normLatEwma: normLatEwma,
-			combined:    combined,
+			nodeIp:   nodeIp,
+			cpuUsage: cpuUsage,
+			latency:  latency,
+			cpuEwma:  cpuEwma,
+			latEwma:  latEwma,
 		})
 	}
 
 	if len(candidates) == 0 {
 		logger.Warn("EWMA no valid nodes after scoring")
 		return []routing.PathInfo{}, nil
+	}
+
+	// Find min/max for min-max normalization
+	minCPU, maxCPU := candidates[0].cpuEwma, candidates[0].cpuEwma
+	minLat, maxLat := candidates[0].latEwma, candidates[0].latEwma
+	for _, c := range candidates {
+		if c.cpuEwma < minCPU {
+			minCPU = c.cpuEwma
+		}
+		if c.cpuEwma > maxCPU {
+			maxCPU = c.cpuEwma
+		}
+		if c.latEwma < minLat {
+			minLat = c.latEwma
+		}
+		if c.latEwma > maxLat {
+			maxLat = c.latEwma
+		}
+	}
+
+	// Second pass: normalize and compute combined score
+	cpuRange := maxCPU - minCPU
+	latRange := maxLat - minLat
+	for i := range candidates {
+		// Min-max normalize to 0-100
+		normCPU := 0.0
+		normLat := 0.0
+		if cpuRange > 0 {
+			normCPU = (candidates[i].cpuEwma - minCPU) / cpuRange * 100
+		}
+		if latRange > 0 {
+			normLat = (candidates[i].latEwma - minLat) / latRange * 100
+		}
+
+		candidates[i].normLatEwma = normLat
+
+		// Calculate combined score: λ * CPU_norm + (1-λ) * Lat_norm
+		candidates[i].combined = r.lambda*normCPU + (1-r.lambda)*normLat
 	}
 
 	// Sort by combined score (ascending - lower is better)
