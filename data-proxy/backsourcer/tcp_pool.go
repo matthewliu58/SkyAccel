@@ -3,7 +3,6 @@ package backsourcer
 import (
 	"bufio"
 	"container/list"
-	"io"
 	"log/slog"
 	"net"
 	"sync"
@@ -182,7 +181,7 @@ func (t *TCPProtocolWithPool) DoRequest(addr string, reqData []byte) ([]byte, er
 
 	reader := bufio.NewReader(conn)
 	line, err := reader.ReadString('\n')
-	if err != nil && err != io.EOF {
+	if err != nil {
 		t.pool.Put(addr, conn, false)
 		return nil, err
 	}
