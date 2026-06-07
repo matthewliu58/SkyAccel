@@ -25,21 +25,22 @@ The SkyAccel project consists of three main components:
 3. **Data Proxy** (`data-proxy/`) — Data forwarding, tunnel management, and user access. Handles incoming user TCP/UDP connections.
 
 ```
-User Traffic ──► Data Proxy (:8081) ──► Edge Node ──► Origin Server
-                      │                        │
-                      ▼                        │
-              Control Plane (:7081) ◄─────────┘
-                      │              Query routing path
-                      ▼
-                 etcd Cluster ◄── Data Plane reports telemetry
+Client ──► [1. Query Route] ──► Control Plane (:7081)
+ │                                  │
+ │                                  ▼
+ │                           etcd Cluster ◄── Data Plane
+ │                                  │
+ │                                  │
+ ▼                                  ▼
+Client ──► [2. Connect with Route] ──► Data Proxy (:8081) ──► Edge Node ──► Origin Server
 ```
 
 **Architecture Flow Explanation:**
 
 **User Request Path:**
-1. User connects to Data Proxy on port 8081
-2. Data Proxy queries Control Plane for optimal routing decisions
-3. Control Plane returns the best Edge Node and path to Origin Server
+1. Client queries Control Plane (:7081) for routing decision
+2. Control Plane returns optimal Edge Node and path
+3. Client connects to Data Proxy (:8081) with routing info
 4. Data Proxy forwards traffic through Edge Node to Origin Server
 
 **Telemetry Data Flow:**
@@ -65,6 +66,44 @@ User Traffic ──► Data Proxy (:8081) ──► Edge Node ──► Origin S
 - Go 1.21+
 - Linux server (Ubuntu 20.04+ recommended)
 - At least 2 nodes with public IPs
+
+### Quick Setup Scripts
+
+For rapid deployment, you can use the provided setup scripts:
+
+```bash
+# 1. Install basic environment (Go, tools)
+bash basic-env.sh
+
+# 2. Optimize network settings (BBR, kernel parameters)
+bash optimize-network.sh
+```
+
+**basic-env.sh**: Installs Go 1.21.3, git, curl, htop, tmux and configures environment variables.
+
+**optimize-network.sh**: Applies network optimizations including:
+- TCP kernel parameter tuning
+- BBR congestion control
+- File descriptor limits
+- Hardware offloading
+- Memory management
+
+### Start Services
+
+**Option A: Quick start (development/testing)**
+```bash
+bash start-services.sh
+```
+This script builds and starts all services in the background using nohup.
+
+**Option B: Systemd service (production)**
+```bash
+bash setup-systemd.sh
+```
+This script builds services and registers them as systemd services with:
+- Auto-start on boot
+- Auto-restart on failure
+- Centralized logging via syslog
 
 ### 1. Define Your Cluster Topology
 
@@ -262,19 +301,6 @@ The `deploy.sh` script:
 3. SCPs it to each remote node
 4. Runs `setup-systemd.sh` to build Go binaries and register systemd services
 
-### 5. Verify Services
-
-```bash
-# On each node:
-sudo systemctl status SkyAccel-control-plane
-sudo systemctl status SkyAccel-data-plane
-sudo systemctl status SkyAccel-data-proxy
-
-# View logs
-sudo journalctl -u SkyAccel-control-plane -f
-tail -f control-plane/log/app.log
-```
-
 ---
 
 ## User-Facing API
@@ -405,26 +431,4 @@ SkyAccel/
 ├── setup-systemd.sh       # Systemd service registration
 ├── build-docker.sh        # Docker build & run
 └── Dockerfile
-```
-
----
-
-## Management Commands
-
-```bash
-# Systemd (on each node)
-sudo systemctl start SkyAccel-control-plane
-sudo systemctl stop SkyAccel-data-proxy
-sudo systemctl restart SkyAccel-data-plane
-sudo journalctl -u SkyAccel-control-plane -f
-
-# Docker
-docker logs SkyAccel-container -f
-docker exec -it SkyAccel-container sh
-docker restart SkyAccel-container
-
-# Manual build & run
-cd control-plane && go build -o control-plane . && ./control-plane
-cd data-plane   && go build -o data-plane .   && ./data-plane
-cd data-proxy   && go build -o data-proxy .   && ./data-proxy
 ```
