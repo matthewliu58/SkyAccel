@@ -1,9 +1,5 @@
 # SkyAccel
 
-**Version**: v1.0.0  
-**Status**: Production-ready  
-**License**: MIT
-
 Modern cloud services increasingly rely on latency-sensitive workloads (LSWs) characterized by bursty arrivals, CPU-intensive execution, and stringent latency requirements. Existing commercial cloud acceleration services (CCASs) are tightly coupled to vendor-specific infrastructures, resulting in limited deployment flexibility and poor portability across heterogeneous multi-cloud environments. 
 
 We present SkyAccel, a cross-cloud traffic acceleration system for LSWs. We identify an inherent asymmetry in end-to-end traffic control. The edge domain focuses on execution stability under dynamic CPU contention, whereas the core domain focuses on routing optimization across heterogeneous inter-cloud paths. 
