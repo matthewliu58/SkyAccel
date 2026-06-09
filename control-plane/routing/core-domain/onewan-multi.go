@@ -65,6 +65,16 @@ func ComputingMulti(solver *ONEWANSolver, start string, ends []string, pre strin
 			continue
 		}
 
+		// Sort paths by latency to ensure correct ordering
+		// This is a safety measure in case Yen's algorithm returns unsorted paths
+		for i := 0; i < len(paths)-1; i++ {
+			for j := i + 1; j < len(paths); j++ {
+				if paths[j].cost < paths[i].cost {
+					paths[i], paths[j] = paths[j], paths[i]
+				}
+			}
+		}
+
 		// Convert to PathInfo format (KSP already calculates correct latency when useLatency=true)
 		var pathInfos []routing.PathInfo
 		for _, path := range paths {
