@@ -6,6 +6,7 @@ import (
 	"control-plane/routing/routing"
 	"fmt"
 	"log/slog"
+	"math"
 	"math/rand"
 	"time"
 )
@@ -65,11 +66,22 @@ func NewFlowOptimizationSolver(edges []*graph.Edge) *FlowOptimizationSolver {
 
 // EdgeFlow records flow information for an edge
 type EdgeFlow struct {
-	flow   float64 // current flow
-	cap    float64 // original capacity u_ij
-	thetaA float64 // dynamic utilization factor [0,1]
-	effCap float64 // effective capacity = thetaA * cap
-	banned bool    // temporarily banned for exploration (not permanently removed)
+	flow     float64 // current flow
+	cap      float64 // original capacity u_ij
+	thetaA   float64 // dynamic utilization factor [0,1]
+	effCap   float64 // effective capacity = thetaA * cap
+	banned   bool    // temporarily banned for exploration (not permanently removed)
+	residual float64 // residual capacity = effCap - flow (forward residual)
+}
+
+// updateResidual updates the residual capacity
+func (ef *EdgeFlow) updateResidual() {
+	ef.residual = ef.effCap - ef.flow
+}
+
+// getReverseResidual returns the reverse residual capacity (equals current flow)
+func (ef *EdgeFlow) getReverseResidual() float64 {
+	return ef.flow // Backward residual = flow (standard residual network)
 }
 
 // computeThetaA computes the dynamic scaling factor theta_a(v) based on CPU utilization
@@ -197,13 +209,15 @@ func (d *FlowOptimizationSolver) buildResidualGraphWithCapacity() map[string]map
 		thetaA := d.computeThetaA(e.Load)
 		effCap := thetaA * d.capacity
 
-		g[e.SourceIp][e.DestinationIp] = &EdgeFlow{
-			flow:   0.0,
-			cap:    d.capacity,
-			thetaA: thetaA,
-			effCap: effCap,
-			banned: false, // initialize as not banned
+		ef := &EdgeFlow{
+			flow:     0.0,
+			cap:      d.capacity,
+			thetaA:   thetaA,
+			effCap:   effCap,
+			banned:   false, // initialize as not banned
+			residual: effCap,
 		}
+		g[e.SourceIp][e.DestinationIp] = ef
 	}
 	return g
 }
@@ -211,6 +225,14 @@ func (d *FlowOptimizationSolver) buildResidualGraphWithCapacity() map[string]map
 const maxHops = 10 // maximum hop limit
 
 // findFeasiblePathWithLatency finds a feasible path that satisfies latency constraint
+// Uses standard residual network:
+//   - Forward edge: residual = effCap - flow
+//   - Backward edge: residual = flow (reverse residual)
+//
+// Key design decisions:
+//  1. Hard constraints: residual > 0 (feasibility)
+//  2. Soft constraints: banned edges add penalty to cost (not hard skip)
+//  3. Reverse edges: only for flow augmentation, NOT for latency optimization
 func (d *FlowOptimizationSolver) findFeasiblePathWithLatency(g map[string]map[string]*EdgeFlow, s, t string) *PathWithInfo {
 	if _, ok := g[s]; !ok {
 		return nil
@@ -222,51 +244,106 @@ func (d *FlowOptimizationSolver) findFeasiblePathWithLatency(g map[string]map[st
 		thetaL = 100.0 // default value
 	}
 
+	// Penalty weight for banned edges (soft constraint, not hard skip)
+	const bannedPenalty = 100.0 // Large penalty but not infinite
+
 	visited := make(map[string]bool)
 	path := []string{}
-	totalLatency := 0.0
 
-	var dfs func(u string) bool
-	dfs = func(u string) bool {
+	var dfs func(u string, currentLatency float64) (bool, float64)
+	dfs = func(u string, currentLatency float64) (bool, float64) {
 		// Hop pruning: stop if current path length (hops = len(path)) exceeds maxHops
 		if len(path) >= maxHops {
-			return false
+			return false, currentLatency
 		}
 
 		if u == t {
 			path = append(path, u)
-			return true
+			return true, currentLatency
 		}
 		visited[u] = true
 		path = append(path, u)
 
+		// Explore forward edges (original direction)
 		for v, ef := range g[u] {
-			if !visited[v] && ef != nil && !ef.banned && ef.flow < ef.effCap {
-				// Estimate latency (using edge's Latency property)
-				edgeLatency := d.getEdgeLatency(u, v)
-				if totalLatency+edgeLatency <= thetaL {
-					totalLatency += edgeLatency
-					if dfs(v) {
-						return true
+			if !visited[v] && ef != nil {
+				// Hard constraint: must have residual capacity
+				if ef.residual <= 0 {
+					continue
+				}
+
+				// Compute edge cost with soft penalty for banned edges
+				edgeCost := d.getEdgeLatency(u, v)
+				if ef.banned {
+					edgeCost += bannedPenalty // Soft penalty instead of hard skip
+				}
+
+				if currentLatency+edgeCost <= thetaL {
+					found, finalLatency := dfs(v, currentLatency+edgeCost)
+					if found {
+						return true, finalLatency
 					}
-					totalLatency -= edgeLatency
+				}
+			}
+		}
+
+		// Explore backward edges (reverse direction using reverse residual)
+		// IMPORTANT: Reverse edges are ONLY for flow augmentation, NOT for latency optimization
+		// They allow "undoing" previously allocated flow without affecting path latency
+		for v := range nodesInGraph(g) {
+			if v == u || visited[v] {
+				continue
+			}
+			// Check if there's an edge from v to u (so u->v is the reverse)
+			if g[v] != nil && g[v][u] != nil {
+				revEf := g[v][u]
+				// Hard constraint: must have reverse residual capacity
+				if revEf.getReverseResidual() <= 0 {
+					continue
+				}
+
+				// Reverse edge cost: only add banned penalty, NOT edge latency
+				// This ensures reverse edges don't artificially reduce path latency
+				edgeCost := 0.0 // Reverse edges don't contribute to latency
+				if revEf.banned {
+					edgeCost += bannedPenalty // Soft penalty for banned reverse edges
+				}
+
+				if currentLatency+edgeCost <= thetaL {
+					found, finalLatency := dfs(v, currentLatency+edgeCost)
+					if found {
+						return true, finalLatency
+					}
 				}
 			}
 		}
 
 		path = path[:len(path)-1]
 		visited[u] = false // Backtrack: restore visited state
-		return false
+		return false, currentLatency
 	}
 
-	if dfs(s) {
+	found, finalLatency := dfs(s, 0.0)
+	if found {
 		return &PathWithInfo{
 			path:    path,
 			dest:    t,
-			latency: totalLatency,
+			latency: finalLatency,
 		}
 	}
 	return nil
+}
+
+// nodesInGraph returns all unique nodes in the graph
+func nodesInGraph(g map[string]map[string]*EdgeFlow) map[string]bool {
+	nodes := make(map[string]bool)
+	for from, edges := range g {
+		nodes[from] = true
+		for to := range edges {
+			nodes[to] = true
+		}
+	}
+	return nodes
 }
 
 // getEdgeLatency gets the latency of an edge (O(1) lookup using latencyMap)
@@ -275,21 +352,28 @@ func (d *FlowOptimizationSolver) getEdgeLatency(from, to string) float64 {
 	if latency, ok := d.latencyMap[key]; ok {
 		return latency
 	}
-	return 10.0 // default latency if edge not found
+	// Return infinity if edge not found - this will cause latency constraint to fail
+	// This prevents silent failures where missing edges get a fake latency value
+	return math.MaxFloat64
 }
 
 // allocateFlow allocates flow along a path
+// Standard residual network update:
+//   - Forward edge: flow += f, residual = effCap - flow
+//   - Backward residual is implicitly flow (no need to store separately)
 func (d *FlowOptimizationSolver) allocateFlow(g map[string]map[string]*EdgeFlow, path []string, flow float64) {
 	for i := 0; i < len(path)-1; i++ {
 		from := path[i]
 		to := path[i+1]
 		if g[from] != nil && g[from][to] != nil {
 			g[from][to].flow += flow
+			g[from][to].updateResidual()
 		}
 	}
 }
 
 // releaseFlow releases flow along a path
+// Standard residual network update - reverses allocateFlow
 func (d *FlowOptimizationSolver) releaseFlow(g map[string]map[string]*EdgeFlow, path []string, flow float64) {
 	for i := 0; i < len(path)-1; i++ {
 		from := path[i]
@@ -299,8 +383,38 @@ func (d *FlowOptimizationSolver) releaseFlow(g map[string]map[string]*EdgeFlow, 
 			if g[from][to].flow < 0 {
 				g[from][to].flow = 0
 			}
+			g[from][to].updateResidual()
 		}
 	}
+}
+
+// validatePaths validates paths against the current residual graph state
+// Returns only paths that are still feasible (all edges have sufficient residual capacity)
+func (d *FlowOptimizationSolver) validatePaths(paths *list.List, g map[string]map[string]*EdgeFlow) *list.List {
+	valid := list.New()
+	for e := paths.Front(); e != nil; e = e.Next() {
+		pi := e.Value.(*PathWithInfo)
+		if d.isPathFeasible(pi.path, g) {
+			valid.PushBack(pi)
+		}
+	}
+	return valid
+}
+
+// isPathFeasible checks if a path is feasible in the current graph state
+func (d *FlowOptimizationSolver) isPathFeasible(path []string, g map[string]map[string]*EdgeFlow) bool {
+	for i := 0; i < len(path)-1; i++ {
+		from := path[i]
+		to := path[i+1]
+		if g[from] == nil || g[from][to] == nil {
+			return false
+		}
+		ef := g[from][to]
+		if ef.banned || ef.residual <= 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // banPathEdges temporarily bans all edges in a path (for exploration)
@@ -340,7 +454,8 @@ func (d *FlowOptimizationSolver) allDestinationsFull(destFlowCount map[string]in
 
 // objective function: maximize path count + diversity - latency
 // Score = path_count * pathWeight + diversity_score * diversityWeight - latency_penalty
-func (d *FlowOptimizationSolver) objective(lst *list.List) float64 {
+// Uses current residual graph state to compute actual path costs
+func (d *FlowOptimizationSolver) objective(lst *list.List, g map[string]map[string]*EdgeFlow) float64 {
 	if lst.Len() == 0 {
 		return 0.0
 	}
@@ -350,20 +465,37 @@ func (d *FlowOptimizationSolver) objective(lst *list.List) float64 {
 	const pathWeight = 10.0
 	const diversityWeight = 1.0
 	const latencyWeight = 0.01
+	const congestionWeight = 1.0 // penalty for using congested edges
 
 	// Count edge usage for diversity calculation
 	edgeUsage := make(map[string]int)
 	totalLatency := 0.0
+	totalCongestion := 0.0
 
 	for e := lst.Front(); e != nil; e = e.Next() {
 		pi := e.Value.(*PathWithInfo)
-		totalLatency += pi.latency
 
-		// Count each edge in the path
+		// Recompute latency from current graph state (not cached value)
+		pathLatency := d.computePathLatency(pi.path, g)
+		totalLatency += pathLatency
+
+		// Count each edge in the path and compute congestion penalty
 		path := pi.path
 		for i := 0; i < len(path)-1; i++ {
-			edgeKey := path[i] + "->" + path[i+1]
+			from := path[i]
+			to := path[i+1]
+			edgeKey := from + "->" + to
 			edgeUsage[edgeKey]++
+
+			// Congestion penalty: based on current residual capacity
+			if g[from] != nil && g[from][to] != nil {
+				ef := g[from][to]
+				// Congestion = 1 - (residual / effCap) -> 0 = uncongested, 1 = fully congested
+				if ef.effCap > 0 {
+					congestion := 1.0 - (ef.residual / ef.effCap)
+					totalCongestion += congestion
+				}
+			}
 		}
 	}
 
@@ -378,9 +510,24 @@ func (d *FlowOptimizationSolver) objective(lst *list.List) float64 {
 	// pathCount is dominant (10x weight) to prioritize max F as per paper
 	pathCount := float64(lst.Len())
 	latencyPenalty := totalLatency * latencyWeight
+	congestionPenalty := totalCongestion * congestionWeight
 
-	// Total score favors: more paths (primary), more diversity (secondary), lower latency (tertiary)
-	return pathCount*pathWeight + diversityScore*diversityWeight - latencyPenalty
+	// Total score favors: more paths (primary), more diversity (secondary),
+	// lower latency (tertiary), lower congestion (quaternary)
+	return pathCount*pathWeight + diversityScore*diversityWeight - latencyPenalty - congestionPenalty
+}
+
+// computePathLatency computes latency of a path using current graph state
+func (d *FlowOptimizationSolver) computePathLatency(path []string, g map[string]map[string]*EdgeFlow) float64 {
+	latency := 0.0
+	for i := 0; i < len(path)-1; i++ {
+		from := path[i]
+		to := path[i+1]
+		// Use edge latency from latencyMap (original edge property)
+		// This is more stable than using dynamic residual-based weights
+		latency += d.getEdgeLatency(from, to)
+	}
+	return latency
 }
 
 // copyPathList copies a path list
@@ -509,7 +656,7 @@ func ComputeMultiDestination(solver *FlowOptimizationSolver, start string, ends 
 
 	// 4. Initialize optimal solution
 	bestPaths := solver.copyPathList(allPaths)
-	bestScore := solver.objective(allPaths)
+	bestScore := solver.objective(allPaths, resGraph)
 
 	// Record initial size before removing paths (for maxIter calculation)
 	initialSize := allPaths.Len()
@@ -576,14 +723,19 @@ func ComputeMultiDestination(solver *FlowOptimizationSolver, start string, ends 
 		}
 
 		// 11. Update optimal solution
-		currentScore := solver.objective(allPaths)
-		if currentScore > bestScore {
-			bestPaths = solver.copyPathList(allPaths)
-			bestScore = currentScore
-		}
-
-		// 12. Unban all edges for next iteration (temporary ban only for exploration)
+		// Critical fix: Evaluate on a stable graph state (after unban)
+		// First unban all edges to get a stable state for evaluation
 		solver.unbanAllEdges(resGraph)
+
+		// Validate current solution against stable graph before evaluation
+		validPaths := solver.validatePaths(allPaths, resGraph)
+		if validPaths.Len() > 0 {
+			currentScore := solver.objective(validPaths, resGraph)
+			if currentScore > bestScore {
+				bestPaths = solver.copyPathList(validPaths)
+				bestScore = currentScore
+			}
+		}
 	}
 
 	// Convert results to PathInfo
