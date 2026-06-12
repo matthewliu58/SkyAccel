@@ -53,7 +53,7 @@ func NewFlowOptimizationSolver(edges []*graph.Edge) *FlowOptimizationSolver {
 		alpha:        2.0,   // iteration count coefficient (increase for more thorough optimization)
 		beta:         0.5,   // path removal ratio (aggressive exploration: remove 90% of initial paths)
 		capacity:     0.0,   // edge capacity computed dynamically in ComputingMulti based on destination count
-		flowsPerDest: 3,     // 3 flows per destination
+		flowsPerDest: 2,     // 3 flows per destination
 		Tu:           60.0,  // safe utilization threshold (node is uncongested below this value)
 		Uhot:         0.0,   // high-percentile utilization threshold (computed as 90th percentile at runtime)
 		epsilon:      0.001, // small constant to prevent division by zero
@@ -129,7 +129,7 @@ func (d *FlowOptimizationSolver) computeThetaLForDestinations(start string, ends
 		avgLatency := totalLatency / float64(len(paths))
 
 		// Set latency constraint to average latency * 2 to allow longer paths
-		d.thetaLMap[end] = avgLatency * 2.0
+		d.thetaLMap[end] = avgLatency * 1.5
 
 		logger.Debug("FlowOptimizationSolver: computed thetaL for destination",
 			slog.String("dest", end),

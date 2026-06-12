@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"control-plane/routing/graph"
 )
@@ -89,34 +91,86 @@ func cgParseCost266Edges(filePath string, logger *slog.Logger) []*graph.Edge {
 }
 
 func TestFlowOptimizationSolverMulti(t *testing.T) {
-	logFile, err := os.Create("carousel_greed_test.log")
-	if err != nil {
-		t.Fatalf("Failed to create log file: %v", err)
-	}
-	defer logFile.Close()
-
-	multiWriter := io.MultiWriter(os.Stdout, logFile)
-	logger := slog.New(slog.NewTextHandler(multiWriter, &slog.HandlerOptions{Level: slog.LevelDebug}))
-
 	cost266File := "evaluation/cost266"
-	edges := cgParseCost266Edges(cost266File, logger)
+
+	// Parse topology to get all nodes
+	tempLogFile, _ := os.Create("temp_carousel_parse.log")
+	defer os.Remove("temp_carousel_parse.log")
+	tempLogger := slog.New(slog.NewTextHandler(tempLogFile, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	edges := cgParseCost266Edges(cost266File, tempLogger)
+	tempLogFile.Close()
+
 	if len(edges) == 0 {
 		t.Fatal("Failed to parse cost266 topology")
 	}
 
-	solver := NewFlowOptimizationSolver(edges)
-
-	source := "Amsterdam"
-	dests := []string{"Paris", "Berlin"}
-
-	logger.Info("Flow Optimization Solver Test",
-		slog.String("source", source),
-		slog.Any("destinations", dests))
-
-	paths, err := solver.ComputingMulti(source, dests, "TEST", logger)
-	if err != nil {
-		t.Fatalf("Error finding paths: %v", err)
+	// Get unique nodes
+	nodeSet := make(map[string]bool)
+	for _, edge := range edges {
+		nodeSet[edge.SourceIp] = true
+	}
+	var nodeList []string
+	for node := range nodeSet {
+		nodeList = append(nodeList, node)
 	}
 
-	logger.Info("Test completed", slog.Int("total_paths", len(paths)))
+	// Shuffle nodes to select 20 unique sources
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(nodeList), func(i, j int) {
+		nodeList[i], nodeList[j] = nodeList[j], nodeList[i]
+	})
+
+	numSources := 20
+	if len(nodeList) < numSources {
+		numSources = len(nodeList)
+	}
+	selectedSources := nodeList[:numSources]
+
+	// Run 20 tests
+	for sourceIdx, source := range selectedSources {
+		logFileName := fmt.Sprintf("carousel_greed_test_%d_%d.log", time.Now().Unix(), sourceIdx+1)
+		logFile, err := os.Create(logFileName)
+		if err != nil {
+			t.Fatalf("Failed to create log file: %v", err)
+		}
+
+		multiWriter := io.MultiWriter(os.Stdout, logFile)
+		logger := slog.New(slog.NewTextHandler(multiWriter, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+		// Parse edges with this logger
+		edges = cgParseCost266Edges(cost266File, logger)
+		if len(edges) == 0 {
+			logFile.Close()
+			t.Fatal("Failed to parse cost266 topology")
+		}
+
+		solver := NewFlowOptimizationSolver(edges)
+
+		// Select 10 random destinations (different from source)
+		var dests []string
+		rand.Shuffle(len(nodeList), func(i, j int) {
+			nodeList[i], nodeList[j] = nodeList[j], nodeList[i]
+		})
+		for _, node := range nodeList {
+			if node != source && len(dests) < 10 {
+				dests = append(dests, node)
+			}
+		}
+
+		logger.Info("Flow Optimization Solver Test",
+			slog.String("source", source),
+			slog.Int("run", sourceIdx+1),
+			slog.Int("total_runs", numSources),
+			slog.Any("destinations", dests))
+
+		paths, err := solver.ComputingMulti(source, dests, "TEST", logger)
+		if err != nil {
+			logger.Error("Error finding paths", slog.String("error", err.Error()))
+			logFile.Close()
+			continue
+		}
+
+		logger.Info("Test completed", slog.Int("total_paths", len(paths)))
+		logFile.Close()
+	}
 }

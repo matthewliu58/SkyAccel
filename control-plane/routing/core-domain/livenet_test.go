@@ -6,9 +6,11 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"math/rand"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"control-plane/routing/graph"
 )
@@ -165,4 +167,106 @@ func TestLiveStyleSolver(t *testing.T) {
 	}
 
 	fmt.Printf("Found %d paths\n", len(paths))
+}
+
+// TestLiveStyleSolverRandom tests with random source and 10 random destinations
+func TestLiveStyleSolverRandom(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+
+	cost266File := "evaluation/cost266"
+
+	// Get all unique nodes from topology
+	tempLogger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelError,
+	}))
+	edges := lsParseCost266Edges(cost266File, tempLogger)
+	if len(edges) == 0 {
+		t.Fatal("Failed to parse cost266 topology")
+	}
+
+	nodes := make(map[string]bool)
+	for _, e := range edges {
+		nodes[e.SourceIp] = true
+	}
+	nodeList := make([]string, 0, len(nodes))
+	for node := range nodes {
+		nodeList = append(nodeList, node)
+	}
+
+	// Shuffle nodes to select 20 unique sources
+	rand.Shuffle(len(nodeList), func(i, j int) { nodeList[i], nodeList[j] = nodeList[j], nodeList[i] })
+
+	// Use up to 20 unique sources (or all available nodes if less than 20)
+	numSources := 20
+	if len(nodeList) < numSources {
+		numSources = len(nodeList)
+	}
+	selectedSources := nodeList[:numSources]
+
+	for sourceIdx, source := range selectedSources {
+		// Create log file for this source
+		logFileName := fmt.Sprintf("livenet_test_random_%d_%d.log", time.Now().Unix(), sourceIdx+1)
+		logFile, err := os.Create(logFileName)
+		if err != nil {
+			t.Fatalf("Failed to create log file: %v", err)
+		}
+
+		multiWriter := io.MultiWriter(os.Stdout, logFile)
+		logger := slog.New(slog.NewTextHandler(multiWriter, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+
+		// Re-parse edges to log them for this run
+		edges = lsParseCost266Edges(cost266File, logger)
+
+		// Randomly select 10 unique destinations (excluding source)
+		rand.Shuffle(len(nodeList), func(i, j int) { nodeList[i], nodeList[j] = nodeList[j], nodeList[i] })
+		var destinations []string
+		for _, node := range nodeList {
+			if node != source && len(destinations) < 10 {
+				destinations = append(destinations, node)
+			}
+		}
+
+		logger.Info("TestLiveStyleSolverRandom started",
+			slog.Int("run", sourceIdx+1),
+			slog.String("source", source),
+			slog.Int("destinations", len(destinations)))
+
+		solver := NewLiveStyleSolver(edges, 2)
+
+		totalPaths := 0
+		totalLatency := 0.0
+		for idx, dest := range destinations {
+			logger.Info("Processing destination",
+				slog.Int("index", idx+1),
+				slog.String("destination", dest))
+
+			paths, err := solver.Computing(source, dest, "RANDOM_TEST", logger)
+			if err != nil {
+				logger.Error("Failed to compute paths",
+					slog.String("destination", dest),
+					slog.String("error", err.Error()))
+				continue
+			}
+
+			for _, path := range paths {
+				totalLatency += path.RawRTT
+			}
+			totalPaths += len(paths)
+		}
+
+		logger.Info("Test completed",
+			slog.Int("run", sourceIdx+1),
+			slog.Int("total_paths", totalPaths),
+			slog.Float64("avg_latency", totalLatency/float64(totalPaths)))
+
+		fmt.Printf("\n=== Run %d/%d - Random Test Summary ===\n", sourceIdx+1, numSources)
+		fmt.Printf("Source: %s\n", source)
+		fmt.Printf("Destinations: %v\n", destinations)
+		fmt.Printf("Total paths: %d\n", totalPaths)
+		fmt.Printf("Average latency: %.2f ms\n", totalLatency/float64(totalPaths))
+
+		logFile.Close()
+	}
 }

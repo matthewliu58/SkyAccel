@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const maxHops = 10 // maximum hop limit
+const maxHops = 30 // maximum hop limit
 
 // ONEWANSolver implements ONE-WAN path selection algorithm
 type ONEWANSolver struct {
@@ -155,7 +155,7 @@ func (os *ONEWANSolver) generateCandidatePaths(start string, ends []string, node
 
 // beamSearchSelection selects best paths using stochastic beam search
 func (os *ONEWANSolver) beamSearchSelection(allCandidates []destCandidates, pre string, logger *slog.Logger) ([]routing.PathInfo, error) {
-	const numIterations = 10
+	const numIterations = 100
 	const pathsPerDest = 2
 	const loadWeight = 5.0
 
