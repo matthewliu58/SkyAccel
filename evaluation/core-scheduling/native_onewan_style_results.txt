@@ -1,0 +1,624 @@
+======================================================================
+ONEWAN - 20 Runs
+======================================================================
+
+--- Run 1 ---
+===== Latency =====
+Mean RTT  : 65.83 ms
+Median RTT: 66.50 ms
+P90 RTT   : 105.50 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 8.586
+Path 2 HAR : 2.197
+Path 3 HAR : 1.300
+Path 4 HAR : 3.076
+Path 5 HAR : 5.054
+Path 6 HAR : 4.116
+Path 7 HAR : 1.690
+Path 8 HAR : 6.388
+Path 9 HAR : 3.240
+Path 10 HAR : 3.931
+Overall HAR mean  : 3.279
+Overall HAR median: 2.898
+Overall HAR P90   : 5.455
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.512
+
+===== Top used edges =====
+IPLSng<->KSCYng | usage=9 | CPU=31%
+HSTNng<->KSCYng | usage=6 | CPU=42%
+DNVRng<->KSCYng | usage=5 | CPU=33%
+ATLAng<->HSTNng | usage=5 | CPU=30%
+ATLAng<->IPLSng | usage=5 | CPU=37%
+
+--- Run 2 ---
+===== Latency =====
+Mean RTT  : 78.72 ms
+Median RTT: 83.50 ms
+P90 RTT   : 120.30 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 2.000
+Path 2 HAR : 32.813
+Path 3 HAR : 49.472
+Path 4 HAR : 6.739
+Path 5 HAR : 1.600
+Path 6 HAR : 41.016
+Path 7 HAR : 11.138
+Path 8 HAR : 8.568
+Path 9 HAR : 3.600
+Path 10 HAR : 60.073
+Overall HAR mean  : 25.873
+Overall HAR median: 11.138
+Overall HAR P90   : 63.678
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.595
+
+===== Top used edges =====
+ATLAng<->WASHng | usage=11 | CPU=46%
+ATLAng<->HSTNng | usage=9 | CPU=31%
+HSTNng<->KSCYng | usage=8 | CPU=37%
+NYCMng<->WASHng | usage=7 | CPU=37%
+CHINng<->NYCMng | usage=7 | CPU=75%
+
+--- Run 3 ---
+===== Latency =====
+Mean RTT  : 70.00 ms
+Median RTT: 70.50 ms
+P90 RTT   : 110.20 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 4.641
+Path 2 HAR : 2.470
+Path 3 HAR : 2.989
+Path 4 HAR : 2.730
+Path 5 HAR : 6.783
+Path 6 HAR : 1.960
+Path 7 HAR : 2.822
+Path 8 HAR : 1.200
+Path 9 HAR : 1.440
+Path 10 HAR : 8.140
+Overall HAR mean  : 8.936
+Overall HAR median: 3.109
+Overall HAR P90   : 20.775
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.549
+
+===== Top used edges =====
+ATLAng<->HSTNng | usage=10 | CPU=40%
+HSTNng<->KSCYng | usage=8 | CPU=31%
+IPLSng<->KSCYng | usage=6 | CPU=39%
+ATLAng<->IPLSng | usage=5 | CPU=37%
+CHINng<->IPLSng | usage=5 | CPU=31%
+
+--- Run 4 ---
+===== Latency =====
+Mean RTT  : 83.83 ms
+Median RTT: 88.00 ms
+P90 RTT   : 137.50 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 4.800
+Path 2 HAR : 4.800
+Path 3 HAR : 3.000
+Path 4 HAR : 4.096
+Path 5 HAR : 43.159
+Path 6 HAR : 1.600
+Path 7 HAR : 2.000
+Path 8 HAR : 6.144
+Path 9 HAR : 3.200
+Path 10 HAR : 9.830
+Overall HAR mean  : 10.107
+Overall HAR median: 7.437
+Overall HAR P90   : 16.375
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.577
+
+===== Top used edges =====
+CHINng<->IPLSng | usage=11 | CPU=32%
+IPLSng<->KSCYng | usage=7 | CPU=34%
+ATLAng<->HSTNng | usage=7 | CPU=36%
+CHINng<->NYCMng | usage=7 | CPU=35%
+NYCMng<->WASHng | usage=7 | CPU=33%
+
+--- Run 5 ---
+===== Latency =====
+Mean RTT  : 77.61 ms
+Median RTT: 78.50 ms
+P90 RTT   : 126.30 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 4.536
+Path 2 HAR : 1.920
+Path 3 HAR : 1.920
+Path 4 HAR : 10.206
+Path 5 HAR : 1.400
+Path 6 HAR : 4.725
+Path 7 HAR : 2.520
+Path 8 HAR : 2.400
+Path 9 HAR : 1.600
+Path 10 HAR : 3.780
+Overall HAR mean  : 4.671
+Overall HAR median: 3.402
+Overall HAR P90   : 10.206
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.519
+
+===== Top used edges =====
+IPLSng<->KSCYng | usage=9 | CPU=37%
+ATLAng<->HSTNng | usage=7 | CPU=31%
+ATLAng<->IPLSng | usage=6 | CPU=41%
+HSTNng<->LOSAng | usage=6 | CPU=32%
+LOSAng<->SNVAng | usage=6 | CPU=53%
+
+--- Run 6 ---
+===== Latency =====
+Mean RTT  : 84.22 ms
+Median RTT: 79.50 ms
+P90 RTT   : 149.90 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 15.241
+Path 2 HAR : 10.886
+Path 3 HAR : 4.860
+Path 4 HAR : 25.082
+Path 5 HAR : 1.800
+Path 6 HAR : 9.331
+Path 7 HAR : 10.206
+Path 8 HAR : 5.184
+Path 9 HAR : 90.587
+Path 10 HAR : 13.686
+Overall HAR mean  : 17.969
+Overall HAR median: 9.331
+Overall HAR P90   : 43.181
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.612
+
+===== Top used edges =====
+NYCMng<->WASHng | usage=9 | CPU=32%
+ATLAng<->WASHng | usage=9 | CPU=32%
+CHINng<->NYCMng | usage=9 | CPU=37%
+CHINng<->IPLSng | usage=9 | CPU=39%
+DNVRng<->KSCYng | usage=7 | CPU=34%
+
+--- Run 7 ---
+===== Latency =====
+Mean RTT  : 100.61 ms
+Median RTT: 97.50 ms
+P90 RTT   : 153.80 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 3.400
+Path 2 HAR : 1.900
+Path 3 HAR : 29.454
+Path 4 HAR : 12.236
+Path 5 HAR : 8.892
+Path 6 HAR : 3.724
+Path 7 HAR : 9.412
+Path 8 HAR : 13.694
+Path 9 HAR : 3.800
+Path 10 HAR : 1.700
+Overall HAR mean  : 9.960
+Overall HAR median: 8.778
+Overall HAR P90   : 19.484
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.769
+
+===== Top used edges =====
+DNVRng<->SNVAng | usage=11 | CPU=31%
+SNVAng<->STTLng | usage=10 | CPU=36%
+DNVRng<->KSCYng | usage=9 | CPU=38%
+DNVRng<->STTLng | usage=8 | CPU=36%
+IPLSng<->KSCYng | usage=5 | CPU=37%
+
+--- Run 8 ---
+===== Latency =====
+Mean RTT  : 80.83 ms
+Median RTT: 69.50 ms
+P90 RTT   : 149.20 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 8.505
+Path 2 HAR : 1.500
+Path 3 HAR : 4.410
+Path 4 HAR : 27.447
+Path 5 HAR : 6.350
+Path 6 HAR : 3.375
+Path 7 HAR : 2.940
+Path 8 HAR : 20.870
+Path 9 HAR : 2.100
+Path 10 HAR : 6.075
+Overall HAR mean  : 11.568
+Overall HAR median: 7.654
+Overall HAR P90   : 29.262
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.590
+
+===== Top used edges =====
+CHINng<->IPLSng | usage=12 | CPU=38%
+ATLAng<->IPLSng | usage=9 | CPU=30%
+ATLAng<->HSTNng | usage=9 | CPU=32%
+ATLAng<->WASHng | usage=6 | CPU=32%
+NYCMng<->WASHng | usage=6 | CPU=38%
+
+--- Run 9 ---
+===== Latency =====
+Mean RTT  : 76.06 ms
+Median RTT: 73.00 ms
+P90 RTT   : 107.30 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 2.080
+Path 2 HAR : 5.976
+Path 3 HAR : 2.704
+Path 4 HAR : 3.786
+Path 5 HAR : 1.600
+Path 6 HAR : 3.808
+Path 7 HAR : 4.516
+Path 8 HAR : 2.240
+Path 9 HAR : 3.536
+Path 10 HAR : 3.515
+Overall HAR mean  : 3.674
+Overall HAR median: 3.424
+Overall HAR P90   : 6.290
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.523
+
+===== Top used edges =====
+ATLAng<->IPLSng | usage=8 | CPU=34%
+ATLAng<->HSTNng | usage=7 | CPU=30%
+IPLSng<->KSCYng | usage=7 | CPU=36%
+HSTNng<->KSCYng | usage=5 | CPU=34%
+CHINng<->NYCMng | usage=5 | CPU=35%
+
+--- Run 10 ---
+===== Latency =====
+Mean RTT  : 92.33 ms
+Median RTT: 90.50 ms
+P90 RTT   : 135.20 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 1.900
+Path 2 HAR : 16.568
+Path 3 HAR : 5.664
+Path 4 HAR : 3.230
+Path 5 HAR : 7.268
+Path 6 HAR : 9.001
+Path 7 HAR : 2.040
+Path 8 HAR : 5.491
+Path 9 HAR : 4.816
+Path 10 HAR : 6.298
+Overall HAR mean  : 6.720
+Overall HAR median: 5.981
+Overall HAR P90   : 11.693
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.560
+
+===== Top used edges =====
+HSTNng<->LOSAng | usage=10 | CPU=35%
+LOSAng<->SNVAng | usage=8 | CPU=37%
+DNVRng<->KSCYng | usage=8 | CPU=39%
+HSTNng<->KSCYng | usage=8 | CPU=38%
+IPLSng<->KSCYng | usage=6 | CPU=33%
+
+--- Run 11 ---
+===== Latency =====
+Mean RTT  : 76.44 ms
+Median RTT: 56.50 ms
+P90 RTT   : 162.00 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 8.577
+Path 2 HAR : 13.727
+Path 3 HAR : 8.123
+Path 4 HAR : 96.396
+Path 5 HAR : 10.559
+Path 6 HAR : 297.747
+Path 7 HAR : 74.151
+Path 8 HAR : 5.415
+Path 9 HAR : 1.900
+Path 10 HAR : 211.329
+Overall HAR mean  : 92.818
+Overall HAR median: 15.429
+Overall HAR P90   : 254.658
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.617
+
+===== Top used edges =====
+CHINng<->NYCMng | usage=10 | CPU=40%
+CHINng<->IPLSng | usage=10 | CPU=44%
+NYCMng<->WASHng | usage=8 | CPU=47%
+ATLAng<->WASHng | usage=8 | CPU=89%
+IPLSng<->KSCYng | usage=6 | CPU=34%
+
+--- Run 12 ---
+===== Latency =====
+Mean RTT  : 72.89 ms
+Median RTT: 62.00 ms
+P90 RTT   : 140.00 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 1.500
+Path 2 HAR : 7.711
+Path 3 HAR : 2.535
+Path 4 HAR : 1.950
+Path 5 HAR : 3.150
+Path 6 HAR : 2.520
+Path 7 HAR : 3.780
+Path 8 HAR : 2.160
+Path 9 HAR : 4.536
+Path 10 HAR : 1.800
+Overall HAR mean  : 3.558
+Overall HAR median: 2.527
+Overall HAR P90   : 5.489
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.492
+
+===== Top used edges =====
+DNVRng<->KSCYng | usage=6 | CPU=58%
+IPLSng<->KSCYng | usage=6 | CPU=33%
+ATLAng<->HSTNng | usage=6 | CPU=33%
+HSTNng<->KSCYng | usage=6 | CPU=56%
+ATLAng<->WASHng | usage=5 | CPU=34%
+
+--- Run 13 ---
+===== Latency =====
+Mean RTT  : 86.28 ms
+Median RTT: 90.50 ms
+P90 RTT   : 133.80 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 8.467
+Path 2 HAR : 1.800
+Path 3 HAR : 7.903
+Path 4 HAR : 5.153
+Path 5 HAR : 12.328
+Path 6 HAR : 3.276
+Path 7 HAR : 1.800
+Path 8 HAR : 5.616
+Path 9 HAR : 6.048
+Path 10 HAR : 2.520
+Overall HAR mean  : 5.166
+Overall HAR median: 4.725
+Overall HAR P90   : 8.072
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.542
+
+===== Top used edges =====
+HSTNng<->LOSAng | usage=9 | CPU=53%
+LOSAng<->SNVAng | usage=9 | CPU=33%
+DNVRng<->KSCYng | usage=7 | CPU=55%
+HSTNng<->KSCYng | usage=6 | CPU=37%
+DNVRng<->STTLng | usage=5 | CPU=35%
+
+--- Run 14 ---
+===== Latency =====
+Mean RTT  : 71.17 ms
+Median RTT: 62.50 ms
+P90 RTT   : 135.60 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 6.327
+Path 2 HAR : 2.340
+Path 3 HAR : 1.200
+Path 4 HAR : 4.032
+Path 5 HAR : 5.141
+Path 6 HAR : 2.880
+Path 7 HAR : 6.814
+Path 8 HAR : 1.950
+Path 9 HAR : 3.744
+Path 10 HAR : 16.218
+Overall HAR mean  : 4.076
+Overall HAR median: 2.784
+Overall HAR P90   : 6.947
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.499
+
+===== Top used edges =====
+IPLSng<->KSCYng | usage=9 | CPU=34%
+ATLAng<->IPLSng | usage=7 | CPU=32%
+DNVRng<->KSCYng | usage=6 | CPU=32%
+ATLAng<->HSTNng | usage=5 | CPU=36%
+ATLAng<->WASHng | usage=4 | CPU=57%
+
+--- Run 15 ---
+===== Latency =====
+Mean RTT  : 65.83 ms
+Median RTT: 66.50 ms
+P90 RTT   : 123.80 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 1.600
+Path 2 HAR : 3.840
+Path 3 HAR : 5.069
+Path 4 HAR : 4.562
+Path 5 HAR : 1.690
+Path 6 HAR : 6.490
+Path 7 HAR : 3.840
+Path 8 HAR : 1.600
+Path 9 HAR : 4.424
+Path 10 HAR : 1.920
+Overall HAR mean  : 3.168
+Overall HAR median: 3.008
+Overall HAR P90   : 4.719
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.510
+
+===== Top used edges =====
+IPLSng<->KSCYng | usage=7 | CPU=31%
+ATLAng<->IPLSng | usage=7 | CPU=32%
+ATLAng<->HSTNng | usage=7 | CPU=46%
+HSTNng<->KSCYng | usage=6 | CPU=30%
+CHINng<->IPLSng | usage=4 | CPU=35%
+
+--- Run 16 ---
+===== Latency =====
+Mean RTT  : 80.75 ms
+Median RTT: 74.50 ms
+P90 RTT   : 122.70 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 2.890
+Path 2 HAR : 4.624
+Path 3 HAR : 1.700
+Path 4 HAR : 1.690
+Path 5 HAR : 7.364
+Path 6 HAR : 9.010
+Path 7 HAR : 8.416
+Path 8 HAR : 4.046
+Path 9 HAR : 1.300
+Path 10 HAR : 2.210
+Overall HAR mean  : 5.289
+Overall HAR median: 4.740
+Overall HAR P90   : 8.854
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.560
+
+===== Top used edges =====
+LOSAng<->SNVAng | usage=8 | CPU=32%
+HSTNng<->LOSAng | usage=8 | CPU=59%
+DNVRng<->SNVAng | usage=8 | CPU=45%
+DNVRng<->KSCYng | usage=8 | CPU=39%
+HSTNng<->KSCYng | usage=7 | CPU=37%
+
+--- Run 17 ---
+===== Latency =====
+Mean RTT  : 84.39 ms
+Median RTT: 90.00 ms
+P90 RTT   : 134.50 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 6.912
+Path 2 HAR : 1.600
+Path 3 HAR : 8.177
+Path 4 HAR : 6.057
+Path 5 HAR : 3.840
+Path 6 HAR : 2.880
+Path 7 HAR : 6.048
+Path 8 HAR : 4.838
+Path 9 HAR : 2.080
+Path 10 HAR : 1.300
+Overall HAR mean  : 5.126
+Overall HAR median: 4.749
+Overall HAR P90   : 8.261
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.564
+
+===== Top used edges =====
+DNVRng<->KSCYng | usage=9 | CPU=37%
+DNVRng<->SNVAng | usage=7 | CPU=33%
+HSTNng<->LOSAng | usage=7 | CPU=50%
+LOSAng<->SNVAng | usage=7 | CPU=30%
+HSTNng<->KSCYng | usage=6 | CPU=48%
+
+--- Run 18 ---
+===== Latency =====
+Mean RTT  : 88.11 ms
+Median RTT: 80.00 ms
+P90 RTT   : 141.00 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 3.724
+Path 2 HAR : 2.660
+Path 3 HAR : 4.011
+Path 4 HAR : 14.550
+Path 5 HAR : 2.550
+Path 6 HAR : 10.699
+Path 7 HAR : 4.522
+Path 8 HAR : 2.550
+Path 9 HAR : 1.700
+Path 10 HAR : 16.049
+Overall HAR mean  : 6.354
+Overall HAR median: 4.173
+Overall HAR P90   : 14.986
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.547
+
+===== Top used edges =====
+LOSAng<->SNVAng | usage=10 | CPU=34%
+HSTNng<->LOSAng | usage=8 | CPU=35%
+DNVRng<->KSCYng | usage=8 | CPU=34%
+ATLAng<->HSTNng | usage=6 | CPU=33%
+HSTNng<->KSCYng | usage=6 | CPU=33%
+
+--- Run 19 ---
+===== Latency =====
+Mean RTT  : 82.50 ms
+Median RTT: 71.00 ms
+P90 RTT   : 161.90 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 8.736
+Path 2 HAR : 6.864
+Path 3 HAR : 5.880
+Path 4 HAR : 3.200
+Path 5 HAR : 10.647
+Path 6 HAR : 20.351
+Path 7 HAR : 7.680
+Path 8 HAR : 1.600
+Path 9 HAR : 2.560
+Path 10 HAR : 4.800
+Overall HAR mean  : 9.825
+Overall HAR median: 6.504
+Overall HAR P90   : 21.995
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.577
+
+===== Top used edges =====
+CHINng<->IPLSng | usage=11 | CPU=58%
+IPLSng<->KSCYng | usage=7 | CPU=40%
+CHINng<->NYCMng | usage=7 | CPU=33%
+NYCMng<->WASHng | usage=7 | CPU=33%
+ATLAng<->WASHng | usage=7 | CPU=55%
+
+--- Run 20 ---
+===== Latency =====
+Mean RTT  : 68.44 ms
+Median RTT: 52.50 ms
+P90 RTT   : 118.00 ms
+
+===== Hot-edge Risk (HAR) =====
+Path 1 HAR : 1.960
+Path 2 HAR : 5.678
+Path 3 HAR : 1.600
+Path 4 HAR : 3.795
+Path 5 HAR : 1.500
+Path 6 HAR : 9.876
+Path 7 HAR : 2.744
+Path 8 HAR : 2.560
+Path 9 HAR : 2.080
+Path 10 HAR : 1.950
+Overall HAR mean  : 3.153
+Overall HAR median: 2.632
+Overall HAR P90   : 5.216
+
+===== Path Structure =====
+Prefix-3 similarity (backbone sharing): 0.492
+
+===== Top used edges =====
+DNVRng<->KSCYng | usage=7 | CPU=37%
+HSTNng<->KSCYng | usage=7 | CPU=33%
+ATLAng<->HSTNng | usage=6 | CPU=38%
+HSTNng<->LOSAng | usage=5 | CPU=48%
+LOSAng<->SNVAng | usage=5 | CPU=33%
+

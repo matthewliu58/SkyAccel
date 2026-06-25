@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CLUSTER_INFO_FILE="cluster-info.txt"
+CLUSTER_INFO_FILE="cluster-info"
 TARGET_PASSWORD="root@12345"
 
 RED='\033[0;31m'
