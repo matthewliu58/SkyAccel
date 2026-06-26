@@ -17,9 +17,9 @@ const (
 )
 
 type RoutingResponse struct {
-	Code int             `json:"code"`
-	Msg  string          `json:"msg"`
-	Data []util.PathInfo `json:"data"`
+	Code int              `json:"code"`
+	Msg  string           `json:"msg"`
+	Data util.RoutingInfo `json:"data"`
 }
 
 type EndPoint struct {
@@ -89,7 +89,5 @@ func GetRoutingFromControlPlane(port int, l *slog.Logger) *util.RoutingInfo {
 		return &util.RoutingInfo{}
 	}
 
-	return &util.RoutingInfo{
-		Routing: routingResp.Data,
-	}
+	return &routingResp.Data
 }
