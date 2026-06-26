@@ -53,7 +53,7 @@ func GetRoutingFromControlPlane(port int, l *slog.Logger) *util.RoutingInfo {
 	}
 
 	req := EndPoints{}
-	req.Source.IP = config.Config_.Node.IP.Private
+	req.Source.IP = config.Config_.Node.IP.Public
 	req.Dest.Port = port
 
 	l.Info("Requesting routing information from control plane", slog.Any("req", req))
