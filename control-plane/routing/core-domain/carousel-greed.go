@@ -812,7 +812,7 @@ func (d *FlowOptimizationSolver) objective(lst *list.List, g map[string]map[stri
 	// Weights for balancing objectives
 	// pathWeight should be dominant to prioritize max F (paper objective)
 	const pathWeight = 10.0
-	const diversityWeight = 1.0
+	const diversityWeight = 0
 	const latencyWeight = 0.1
 	const congestionWeight = 1.0 // penalty for using congested edges
 
