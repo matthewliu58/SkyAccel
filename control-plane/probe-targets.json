@@ -1,8 +1,8 @@
 [
   {
     "server_port":8081,
-    "provider": "Alibaba",
-    "ip": "47.86.234.131",
+    "provider": "GCP",
+    "ip": "34.92.92.183",
     "port": 8081,
     "region": "Asia",
     "id": "HongKong"
