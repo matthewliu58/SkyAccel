@@ -3,9 +3,9 @@
 # And can be referenced by control-plane, data-plane, and data-proxy modules
 
 provider: "Vultr"
-continent: "Asia"
-country: "KR"
-city: "Seoul"
+continent: "NorthAmerica"
+country: "US"
+city: "LA"
 ip:
   private: "0.0.0.0"
-  public: "158.247.193.232"
+  public: "45.32.92.150"
